@@ -4,6 +4,7 @@ import type { AuthedRequest } from "../../auth/middleware.js";
 import { buildUserContext } from "./contextBuilder.js";
 import { callClaudeJson } from "./claudeClient.js";
 import { parseInsight } from "./insight.js";
+import { TRAINING_KNOWLEDGE_BASE } from "./knowledgeBase.js";
 
 export const weeklyReportRouter = Router();
 
@@ -17,8 +18,9 @@ interface WeeklyReportPayload {
 async function generateReport(userId: string) {
   const context = await buildUserContext(userId);
   const result = await callClaudeJson<WeeklyReportPayload>({
-    system:
-      "Je bent een kracht- en voedingscoach die elke week een kort voortgangsrapport schrijft op basis van de data van de gebruiker. Wees eerlijk en specifiek, gebruik concrete cijfers uit de data waar mogelijk. Antwoord in het Nederlands.",
+    system: `Je bent een kracht- en voedingscoach die elke week een kort voortgangsrapport schrijft op basis van de data van de gebruiker. Wees eerlijk en specifiek, gebruik concrete cijfers uit de data waar mogelijk (bv. sets per spiergroep versus de aanbevolen range, eiwitinname versus doel). Antwoord in het Nederlands.
+
+${TRAINING_KNOWLEDGE_BASE}`,
     messages: [
       {
         role: "user",

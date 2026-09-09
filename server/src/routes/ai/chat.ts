@@ -4,12 +4,16 @@ import { prisma } from "../../db.js";
 import type { AuthedRequest } from "../../auth/middleware.js";
 import { buildUserContext } from "./contextBuilder.js";
 import { callClaude } from "./claudeClient.js";
+import { TRAINING_KNOWLEDGE_BASE } from "./knowledgeBase.js";
 
 export const chatRouter = Router();
 
 const COACH_SYSTEM_PROMPT = `Je bent een ervaren, evidence-based kracht- en voedingscoach die de persoonlijke trainings- en voedingsdata van de gebruiker tot in detail kent.
 Geef concrete, onderbouwde adviezen op basis van de data hieronder. Wees direct en praktisch, geen wollige taal.
+Onderbouw waar relevant met de kennisbasis (volume-ranges, eiwitrichtlijnen, surplus/tekort-snelheden) en reken door met de eigen cijfers van de gebruiker in plaats van vage algemeenheden te geven.
 Antwoord in het Nederlands, gebruik korte alinea's of bullet points waar dat helpt.
+
+${TRAINING_KNOWLEDGE_BASE}
 
 DATA VAN DE GEBRUIKER:
 `;

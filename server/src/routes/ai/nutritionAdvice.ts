@@ -4,6 +4,7 @@ import type { AuthedRequest } from "../../auth/middleware.js";
 import { buildUserContext } from "./contextBuilder.js";
 import { callClaude } from "./claudeClient.js";
 import { parseInsight } from "./insight.js";
+import { TRAINING_KNOWLEDGE_BASE } from "./knowledgeBase.js";
 
 export const nutritionAdviceRouter = Router();
 
@@ -54,8 +55,9 @@ nutritionAdviceRouter.post("/generate", async (req: AuthedRequest, res) => {
 
   try {
     const advice = await callClaude({
-      system:
-        "Je bent een sportvoedingscoach. Geef in maximaal 4 zinnen concreet en praktisch advies voor de rest van de dag, gebaseerd op wat er al gegeten is versus het doel en of het een trainingsdag is. Antwoord in het Nederlands, geen inleidende zinnen.",
+      system: `Je bent een sportvoedingscoach. Geef in maximaal 4 zinnen concreet en praktisch advies voor de rest van de dag, gebaseerd op wat er al gegeten is versus het doel en of het een trainingsdag is. Reken waar mogelijk door met de eigen cijfers van de gebruiker (resterende eiwit/calorieën) in plaats van algemene tips. Antwoord in het Nederlands, geen inleidende zinnen.
+
+${TRAINING_KNOWLEDGE_BASE}`,
       messages: [{ role: "user", content: `${context}\n\n${todaySummary}\n\nGeef advies voor de rest van vandaag.` }],
       maxTokens: 400,
     });

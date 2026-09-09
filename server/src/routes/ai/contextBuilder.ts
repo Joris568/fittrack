@@ -65,6 +65,28 @@ export async function buildUserContext(userId: string): Promise<string> {
     lines.push(`Totaal aantal sessies: ${sessions.length}`);
   }
 
+  // Weekly volume per muscle group (last 7 days) — directly comparable to the 10-20 sets/week guideline.
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const recentSessions = sessions.filter((s) => s.date >= sevenDaysAgo);
+  lines.push("\n## Trainingsvolume per spiergroep (laatste 7 dagen)");
+  if (recentSessions.length === 0) {
+    lines.push("Geen trainingen in de laatste 7 dagen.");
+  } else {
+    const setsByMuscleGroup = new Map<string, number>();
+    for (const session of recentSessions) {
+      for (const set of session.setLogs) {
+        setsByMuscleGroup.set(
+          set.exercise.muscleGroup,
+          (setsByMuscleGroup.get(set.exercise.muscleGroup) ?? 0) + 1
+        );
+      }
+    }
+    for (const [muscleGroup, sets] of setsByMuscleGroup) {
+      lines.push(`- ${muscleGroup}: ${sets} sets (richtlijn: 10-20 sets/week)`);
+    }
+  }
+
   // Nutrition goal
   lines.push("\n## Voedingsdoel");
   if (goal) {
@@ -105,6 +127,16 @@ export async function buildUserContext(userId: string): Promise<string> {
   } else {
     for (const m of [...bodyMetrics].reverse()) {
       lines.push(`- ${fmtDate(m.date)}: ${m.weightKg}kg${m.bodyFatPct ? ` (${m.bodyFatPct}% vet)` : ""}`);
+    }
+    const oldest = bodyMetrics[bodyMetrics.length - 1];
+    const newest = bodyMetrics[0];
+    const days = (newest.date.getTime() - oldest.date.getTime()) / (1000 * 60 * 60 * 24);
+    if (days >= 6) {
+      const kgPerWeek = ((newest.weightKg - oldest.weightKg) / days) * 7;
+      const pctPerWeek = (kgPerWeek / oldest.weightKg) * 100;
+      lines.push(
+        `Trend: ${kgPerWeek >= 0 ? "+" : ""}${kgPerWeek.toFixed(2)}kg/week (${pctPerWeek.toFixed(2)}%/week) over ${Math.round(days)} dagen.`
+      );
     }
   }
 
