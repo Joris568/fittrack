@@ -1,6 +1,6 @@
 # FitTrack
 
-Persoonlijke training- en voedingsapp met een AI-coach die je data kent: trainingen bouwen en bijhouden, eten loggen via een echte voedingsdatabase, en Claude die actief meedenkt (chat, programma-optimalisatie, dagelijks voedingsadvies, wekelijkse rapportages).
+Persoonlijke training- en voedingsapp met een AI-coach die je data kent: trainingen bouwen en bijhouden, eten loggen via een echte voedingsdatabase, Claude die actief meedenkt (chat, programma-optimalisatie, dagelijks voedingsadvies, wekelijkse rapportages), en gamification (streaks, persoonlijke records, badges) die consistentie beloont.
 
 ## Stack
 - **Server**: Express + TypeScript, serveert ook de gebouwde React-app (één service).

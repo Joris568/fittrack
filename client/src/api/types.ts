@@ -46,6 +46,7 @@ export interface SetLog {
   weight: number;
   rpe?: number | null;
   notes?: string | null;
+  isPR: boolean;
   createdAt: string;
 }
 
@@ -138,4 +139,26 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+}
+
+export interface UnlockedAchievement {
+  key: string;
+  title: string;
+  description: string;
+}
+
+export interface AchievementStatus extends UnlockedAchievement {
+  unlocked: boolean;
+  unlockedAt: string | null;
+}
+
+export interface GamificationSummary {
+  streakWeeks: number;
+  totalWorkouts: number;
+  totalPRs: number;
+  achievements: AchievementStatus[];
+}
+
+export interface WithAchievements {
+  newAchievements: UnlockedAchievement[];
 }

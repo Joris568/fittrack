@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
+import { checkAndUnlockAchievements } from "../gamification/achievements.js";
 
 export const foodRouter = Router();
 
@@ -120,7 +121,8 @@ foodRouter.post("/log", async (req: AuthedRequest, res) => {
     },
     include: { foodItem: true },
   });
-  res.status(201).json(entry);
+  const newAchievements = await checkAndUnlockAchievements(req.userId!);
+  res.status(201).json({ ...entry, newAchievements });
 });
 
 foodRouter.get("/log", async (req: AuthedRequest, res) => {

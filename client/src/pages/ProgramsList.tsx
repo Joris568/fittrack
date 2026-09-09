@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
-import { WorkoutProgram, WorkoutSession } from "../api/types.js";
+import { WorkoutProgram, WorkoutSession, WithAchievements } from "../api/types.js";
 import { Card, Button, Input, Spinner, EmptyState, PageTitle } from "../components/ui.js";
+import { emitAchievements } from "../lib/achievementBus.js";
 
 export default function ProgramsList() {
   const [programs, setPrograms] = useState<WorkoutProgram[] | null>(null);
@@ -21,19 +22,22 @@ export default function ProgramsList() {
   async function createProgram(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
-    const program = await api.post<WorkoutProgram>("/programs", { name: newName });
+    const program = await api.post<WorkoutProgram & WithAchievements>("/programs", { name: newName });
+    emitAchievements(program.newAchievements);
     setNewName("");
     setCreating(false);
     navigate(`/train/programs/${program.id}`);
   }
 
   async function startDay(dayId: string) {
-    const session = await api.post<WorkoutSession>("/workouts", { programDayId: dayId });
+    const session = await api.post<WorkoutSession & WithAchievements>("/workouts", { programDayId: dayId });
+    emitAchievements(session.newAchievements);
     navigate(`/train/session/${session.id}`);
   }
 
   async function startFreestyle() {
-    const session = await api.post<WorkoutSession>("/workouts", {});
+    const session = await api.post<WorkoutSession & WithAchievements>("/workouts", {});
+    emitAchievements(session.newAchievements);
     navigate(`/train/session/${session.id}`);
   }
 

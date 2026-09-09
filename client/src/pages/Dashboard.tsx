@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
-import { AiInsight, FoodLogEntry, NutritionGoal, WeeklyReportContent } from "../api/types.js";
+import { AiInsight, FoodLogEntry, GamificationSummary, NutritionGoal, WeeklyReportContent } from "../api/types.js";
 import { Card, Button, Spinner, PageTitle } from "../components/ui.js";
 
 function MacroBar({ label, value, goal }: { label: string; value: number; goal: number }) {
@@ -29,6 +29,7 @@ export default function Dashboard() {
   const [report, setReport] = useState<AiInsight<WeeklyReportContent> | null>(null);
   const [reportLoading, setReportLoading] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [gamification, setGamification] = useState<GamificationSummary | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -44,13 +45,20 @@ export default function Dashboard() {
       } finally {
         setLoading(false);
       }
+    })();
+
+    (async () => {
       try {
         const r = await api.get<AiInsight<WeeklyReportContent>>("/ai/weekly-report/latest");
         setReport(r);
+      } catch {
+        // No report yet (e.g. AI not configured) — leave it null, dashboard still renders.
       } finally {
         setReportLoading(false);
       }
     })();
+
+    api.get<GamificationSummary>("/gamification/summary").then(setGamification).catch(() => {});
   }, []);
 
   async function generateAdvice() {
@@ -80,6 +88,33 @@ export default function Dashboard() {
   return (
     <div className="space-y-4">
       <PageTitle>Vandaag</PageTitle>
+
+      {gamification && (
+        <Card>
+          <div className="flex justify-around text-center">
+            <div>
+              <p className="text-2xl leading-none">🔥</p>
+              <p className="font-bold text-lg mt-1">{gamification.streakWeeks}</p>
+              <p className="text-xs text-gray-400">{gamification.streakWeeks === 1 ? "week op rij" : "weken op rij"}</p>
+            </div>
+            <div>
+              <p className="text-2xl leading-none">🏆</p>
+              <p className="font-bold text-lg mt-1">{gamification.totalPRs}</p>
+              <p className="text-xs text-gray-400">PR&apos;s</p>
+            </div>
+            <div>
+              <p className="text-2xl leading-none">🎖️</p>
+              <p className="font-bold text-lg mt-1">
+                {gamification.achievements.filter((a) => a.unlocked).length}/{gamification.achievements.length}
+              </p>
+              <p className="text-xs text-gray-400">badges</p>
+            </div>
+          </div>
+          <Link to="/settings" className="block mt-3 text-center text-sm text-brand-600 font-medium">
+            Alle badges bekijken →
+          </Link>
+        </Card>
+      )}
 
       <Card>
         <div className="flex justify-between items-center mb-3">

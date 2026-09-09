@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
+import { checkAndUnlockAchievements } from "../gamification/achievements.js";
 
 export const programsRouter = Router();
 
@@ -39,7 +40,8 @@ programsRouter.post("/", async (req: AuthedRequest, res) => {
   const program = await prisma.workoutProgram.create({
     data: { ...parsed.data, userId: req.userId! },
   });
-  res.status(201).json(program);
+  const newAchievements = await checkAndUnlockAchievements(req.userId!);
+  res.status(201).json({ ...program, newAchievements });
 });
 
 programsRouter.patch("/:id", async (req: AuthedRequest, res) => {

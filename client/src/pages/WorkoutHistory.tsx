@@ -119,6 +119,7 @@ export default function WorkoutHistory() {
               {session.setLogs.map((s) => (
                 <p key={s.id} className="text-sm text-gray-600">
                   {s.exercise.name}: {s.reps}x{s.weight}kg{s.rpe ? ` @RPE${s.rpe}` : ""}
+                  {s.isPR && <span className="ml-1.5 text-amber-600 font-semibold">🏆 PR</span>}
                 </p>
               ))}
             </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
-import { BodyMetric } from "../api/types.js";
+import { BodyMetric, GamificationSummary } from "../api/types.js";
 import { useAuth } from "../context/AuthContext.js";
 import { Button, Card, Input, PageTitle } from "../components/ui.js";
 
@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const [metrics, setMetrics] = useState<BodyMetric[]>([]);
   const [weight, setWeight] = useState("");
   const [bodyFat, setBodyFat] = useState("");
+  const [gamification, setGamification] = useState<GamificationSummary | null>(null);
 
   async function load() {
     setMetrics(await api.get<BodyMetric[]>("/body-metrics"));
@@ -18,6 +19,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     load();
+    api.get<GamificationSummary>("/gamification/summary").then(setGamification);
   }, []);
 
   async function addMetric(e: React.FormEvent) {
@@ -40,6 +42,27 @@ export default function SettingsPage() {
   return (
     <div className="space-y-4">
       <PageTitle>Meer</PageTitle>
+
+      {gamification && (
+        <Card>
+          <h2 className="font-semibold mb-3">
+            Badges ({gamification.achievements.filter((a) => a.unlocked).length}/{gamification.achievements.length})
+          </h2>
+          <div className="grid grid-cols-2 gap-2">
+            {gamification.achievements.map((a) => (
+              <div
+                key={a.key}
+                className={`rounded-xl px-3 py-2.5 ${a.unlocked ? "bg-brand-50" : "bg-gray-50 opacity-50"}`}
+              >
+                <p className={`text-sm font-medium ${a.unlocked ? "text-brand-700" : "text-gray-500"}`}>
+                  {a.unlocked ? "🏅" : "🔒"} {a.title}
+                </p>
+                <p className="text-xs text-gray-400 mt-0.5">{a.description}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card>
         <h2 className="font-semibold mb-2">Lichaamsgewicht loggen</h2>

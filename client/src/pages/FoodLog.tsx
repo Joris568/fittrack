@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
-import { FoodLogEntry, FoodSearchResult, NutritionGoal } from "../api/types.js";
+import { FoodLogEntry, FoodSearchResult, NutritionGoal, WithAchievements } from "../api/types.js";
 import { Button, Card, Input, Spinner, EmptyState, PageTitle } from "../components/ui.js";
+import { emitAchievements } from "../lib/achievementBus.js";
 
 const MEAL_TYPES: { key: FoodLogEntry["mealType"]; label: string }[] = [
   { key: "breakfast", label: "Ontbijt" },
@@ -44,11 +45,12 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
 
   async function confirmSelected() {
     if (!selected || !quantity) return;
-    await api.post("/food/log", {
+    const entry = await api.post<WithAchievements>("/food/log", {
       mealType,
       quantityGrams: Number(quantity),
       foodItem: selected,
     });
+    emitAchievements(entry.newAchievements);
     onAdded();
   }
 
@@ -61,11 +63,12 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
       carbsPer100g: Number(manualForm.carbs || 0),
       fatPer100g: Number(manualForm.fat || 0),
     });
-    await api.post("/food/log", {
+    const entry = await api.post<WithAchievements>("/food/log", {
       mealType,
       quantityGrams: Number(quantity || 100),
       foodItemId: item.id,
     });
+    emitAchievements(entry.newAchievements);
     onAdded();
   }
 

@@ -19,6 +19,7 @@ model User {
   bodyMetrics   BodyMetric[]
   insights      AiInsight[]
   chatMessages  ChatMessage[]
+  achievements  Achievement[]
 }
 
 // ---------- Training ----------
@@ -98,6 +99,7 @@ model SetLog {
   weight           Float
   rpe              Float?
   notes            String?
+  isPR             Boolean  @default(false)
   createdAt        DateTime @default(now())
 }
 
@@ -178,4 +180,16 @@ model ChatMessage {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ---------- Gamification ----------
+
+model Achievement {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  key        String   // matches a key in the ACHIEVEMENTS catalog
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, key])
 }

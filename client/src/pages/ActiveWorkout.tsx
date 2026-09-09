@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
-import { Exercise, ProgramExercise, SetLog, WorkoutSession } from "../api/types.js";
+import { Exercise, ProgramExercise, SetLog, WithAchievements, WorkoutSession } from "../api/types.js";
 import { Button, Card, Input, Spinner } from "../components/ui.js";
+import { emitAchievements } from "../lib/achievementBus.js";
 
 function SetRow({ set, onDelete }: { set: SetLog; onDelete: () => void }) {
   return (
@@ -10,6 +11,7 @@ function SetRow({ set, onDelete }: { set: SetLog; onDelete: () => void }) {
       <span>
         Set {set.setNumber}: <strong>{set.reps}</strong> reps @ <strong>{set.weight}</strong>kg
         {set.rpe ? ` (RPE ${set.rpe})` : ""}
+        {set.isPR && <span className="ml-1.5 text-amber-600 font-semibold">🏆 PR</span>}
       </span>
       <button className="text-gray-300 text-xs" onClick={onDelete}>
         ✕
@@ -46,13 +48,14 @@ function ExerciseBlock({
   async function addSet(e: React.FormEvent) {
     e.preventDefault();
     if (!reps || !weight) return;
-    await api.post(`/workouts/${sessionId}/sets`, {
+    const result = await api.post<SetLog & WithAchievements>(`/workouts/${sessionId}/sets`, {
       exerciseId: exercise.id,
       setNumber: sets.length + 1,
       reps: Number(reps),
       weight: Number(weight),
       rpe: rpe ? Number(rpe) : undefined,
     });
+    emitAchievements(result.newAchievements);
     setRpe("");
     onChange();
   }

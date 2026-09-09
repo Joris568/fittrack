@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
+import { checkAndUnlockAchievements } from "../gamification/achievements.js";
 
 export const workoutsRouter = Router();
 
@@ -63,7 +64,8 @@ workoutsRouter.post("/", async (req: AuthedRequest, res) => {
       date: parsed.data.date ? new Date(parsed.data.date) : undefined,
     },
   });
-  res.status(201).json(session);
+  const newAchievements = await checkAndUnlockAchievements(req.userId!);
+  res.status(201).json({ ...session, newAchievements });
 });
 
 workoutsRouter.patch("/:id", async (req: AuthedRequest, res) => {
@@ -101,11 +103,19 @@ workoutsRouter.post("/:id/sets", async (req: AuthedRequest, res) => {
     where: { id: req.params.id, userId: req.userId },
   });
   if (!session) return res.status(404).json({ error: "Not found" });
+
+  const previousBest = await prisma.setLog.aggregate({
+    where: { exerciseId: parsed.data.exerciseId, workoutSession: { userId: req.userId } },
+    _max: { weight: true },
+  });
+  const isPR = previousBest._max.weight != null && parsed.data.weight > previousBest._max.weight;
+
   const setLog = await prisma.setLog.create({
-    data: { workoutSessionId: session.id, ...parsed.data },
+    data: { workoutSessionId: session.id, ...parsed.data, isPR },
     include: { exercise: true },
   });
-  res.status(201).json(setLog);
+  const newAchievements = await checkAndUnlockAchievements(req.userId!);
+  res.status(201).json({ ...setLog, newAchievements });
 });
 
 workoutsRouter.patch("/sets/:setId", async (req: AuthedRequest, res) => {
