@@ -21,7 +21,10 @@ function ProgressChart() {
   const chartData = useMemo(() => {
     const byDate = new Map<string, number>();
     for (const s of [...history].reverse()) {
-      const date = new Date(s.createdAt).toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit" });
+      const date = new Date(s.workoutSession?.date ?? s.createdAt).toLocaleDateString("nl-NL", {
+        day: "2-digit",
+        month: "2-digit",
+      });
       byDate.set(date, Math.max(byDate.get(date) ?? 0, s.weight));
     }
     return [...byDate.entries()].map(([date, weight]) => ({ date, weight }));
@@ -49,7 +52,14 @@ function ProgressChart() {
             <XAxis dataKey="date" fontSize={11} />
             <YAxis fontSize={11} width={30} />
             <Tooltip />
-            <Line type="monotone" dataKey="weight" stroke="#16b862" strokeWidth={2} dot={{ r: 3 }} />
+            <Line
+              type="monotone"
+              dataKey="weight"
+              stroke="#16b862"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              isAnimationActive={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       ) : selected ? (

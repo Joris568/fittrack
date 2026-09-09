@@ -48,6 +48,8 @@ export interface SetLog {
   notes?: string | null;
   isPR: boolean;
   createdAt: string;
+  /** Only present on the /workouts/exercise/:id/history endpoint. */
+  workoutSession?: { date: string };
 }
 
 export interface WorkoutSession {
