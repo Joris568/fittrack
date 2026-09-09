@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  programs      WorkoutProgram[]
+  sessions      WorkoutSession[]
+  foodLogs      FoodLogEntry[]
+  goals         NutritionGoal[]
+  bodyMetrics   BodyMetric[]
+  insights      AiInsight[]
+  chatMessages  ChatMessage[]
+}
+
+// ---------- Training ----------
+
+model Exercise {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  muscleGroup String
+  equipment   String?
+  notes       String?
+  isCustom    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  programExercises ProgramExercise[]
+  setLogs          SetLog[]
+}
+
+model WorkoutProgram {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  days ProgramDay[]
+}
+
+model ProgramDay {
+  id        String   @id @default(cuid())
+  programId String
+  program   WorkoutProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  name      String
+  order     Int      @default(0)
+
+  exercises ProgramExercise[]
+  sessions  WorkoutSession[]
+}
+
+model ProgramExercise {
+  id            String   @id @default(cuid())
+  programDayId  String
+  programDay    ProgramDay @relation(fields: [programDayId], references: [id], onDelete: Cascade)
+  exerciseId    String
+  exercise      Exercise   @relation(fields: [exerciseId], references: [id])
+  order         Int      @default(0)
+  targetSets    Int      @default(3)
+  targetRepsMin Int      @default(8)
+  targetRepsMax Int      @default(12)
+  targetWeight  Float?
+  targetRpe     Float?
+  notes         String?
+}
+
+model WorkoutSession {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  programDayId String?
+  programDay   ProgramDay? @relation(fields: [programDayId], references: [id])
+  date         DateTime @default(now())
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  setLogs SetLog[]
+}
+
+model SetLog {
+  id               String   @id @default(cuid())
+  workoutSessionId String
+  workoutSession   WorkoutSession @relation(fields: [workoutSessionId], references: [id], onDelete: Cascade)
+  exerciseId       String
+  exercise         Exercise @relation(fields: [exerciseId], references: [id])
+  setNumber        Int
+  reps             Int
+  weight           Float
+  rpe              Float?
+  notes            String?
+  createdAt        DateTime @default(now())
+}
+
+// ---------- Nutrition ----------
+
+model FoodItem {
+  id            String   @id @default(cuid())
+  source        String   // "openfoodfacts" | "custom"
+  barcode       String?  @unique
+  name          String
+  brand         String?
+  caloriesPer100g Float
+  proteinPer100g  Float
+  carbsPer100g    Float
+  fatPer100g      Float
+  fiberPer100g    Float?
+  createdAt     DateTime @default(now())
+
+  logEntries FoodLogEntry[]
+
+  @@index([name])
+}
+
+model FoodLogEntry {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  foodItemId     String
+  foodItem       FoodItem @relation(fields: [foodItemId], references: [id])
+  date           DateTime @default(now())
+  mealType       String   // breakfast | lunch | dinner | snack
+  quantityGrams  Float
+  createdAt      DateTime @default(now())
+}
+
+model NutritionGoal {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  calories      Int
+  proteinGrams  Int
+  carbsGrams    Int
+  fatGrams      Int
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+}
+
+model BodyMetric {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  date       DateTime @default(now())
+  weightKg   Float
+  bodyFatPct Float?
+  createdAt  DateTime @default(now())
+}
+
+// ---------- AI ----------
+
+model AiInsight {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // workout_suggestion | nutrition_advice | weekly_report
+  content   String   // JSON-encoded payload, shape depends on `type`
+  status    String   @default("pending") // pending | accepted | dismissed
+  createdAt DateTime @default(now())
+
+  @@index([userId, type, createdAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      String   // user | assistant
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}

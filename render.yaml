@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: fittrack
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build && npm run db:push && npm run seed
+    startCommand: npm run start
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+      - key: APP_USER_EMAIL
+        value: me@fittrack.local
+      - key: NODE_ENV
+        value: production
