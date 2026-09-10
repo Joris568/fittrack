@@ -17,6 +17,7 @@ export interface ProgramExercise {
   targetRepsMax: number;
   targetWeight?: number | null;
   targetRpe?: number | null;
+  restSeconds?: number | null;
   notes?: string | null;
 }
 
@@ -109,6 +110,51 @@ export interface BodyMetric {
   date: string;
   weightKg: number;
   bodyFatPct?: number | null;
+  waistCm?: number | null;
+  chestCm?: number | null;
+  armCm?: number | null;
+  thighCm?: number | null;
+  hipCm?: number | null;
+}
+
+export interface ProgressPhoto {
+  id: string;
+  date: string;
+  imageData: string;
+  notes?: string | null;
+}
+
+export interface FavoriteFood {
+  id: string;
+  foodItem: FoodItem;
+}
+
+export interface RecentFood {
+  foodItem: FoodItem;
+  lastQuantityGrams: number;
+}
+
+export interface PlateauResult {
+  programExerciseId: string;
+  exerciseName: string;
+  sessionsFlat: number;
+  weights: number[];
+}
+
+export interface ParsedProgramDay {
+  name: string;
+  exercises: {
+    exerciseName: string;
+    targetSets: number;
+    targetRepsMin: number;
+    targetRepsMax: number;
+    targetWeight?: number;
+  }[];
+}
+
+export interface ParsedProgram {
+  programName: string;
+  days: ParsedProgramDay[];
 }
 
 export interface AiInsight<T = unknown> {

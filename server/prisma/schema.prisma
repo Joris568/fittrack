@@ -20,6 +20,8 @@ model User {
   foodLogs      FoodLogEntry[]
   goals         NutritionGoal[]
   bodyMetrics   BodyMetric[]
+  progressPhotos ProgressPhoto[]
+  favoriteFoods FavoriteFood[]
   recipes       Recipe[]
   insights      AiInsight[]
   chatMessages  ChatMessage[]
@@ -76,6 +78,7 @@ model ProgramExercise {
   targetRepsMax Int      @default(12)
   targetWeight  Float?
   targetRpe     Float?
+  restSeconds   Int?
   notes         String?
 }
 
@@ -124,6 +127,7 @@ model FoodItem {
 
   logEntries FoodLogEntry[]
   recipe     Recipe?
+  favoritedBy FavoriteFood[]
 
   @@index([name])
 }
@@ -176,7 +180,33 @@ model BodyMetric {
   date       DateTime @default(now())
   weightKg   Float
   bodyFatPct Float?
+  waistCm    Float?
+  chestCm    Float?
+  armCm      Float?
+  thighCm    Float?
+  hipCm      Float?
   createdAt  DateTime @default(now())
+}
+
+model ProgressPhoto {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  date      DateTime @default(now())
+  imageData String   // base64 data URL — fine at personal-app scale, avoids needing external file storage
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model FavoriteFood {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  foodItemId String
+  foodItem   FoodItem @relation(fields: [foodItemId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, foodItemId])
 }
 
 // ---------- AI ----------

@@ -2,7 +2,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { api } from "../api/client.js";
-import { FoodLogEntry, FoodSearchResult, NutritionDaySummary, NutritionGoal, WithAchievements } from "../api/types.js";
+import {
+  FavoriteFood,
+  FoodItem,
+  FoodLogEntry,
+  FoodSearchResult,
+  NutritionDaySummary,
+  NutritionGoal,
+  RecentFood,
+  WithAchievements,
+} from "../api/types.js";
 import { Button, Card, Input, Spinner, PageTitle } from "../components/ui.js";
 import { emitAchievements } from "../lib/achievementBus.js";
 import BarcodeScanner from "../components/BarcodeScanner.js";
@@ -72,12 +81,19 @@ function AddFoodPanel({
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [selected, setSelected] = useState<FoodSearchResult | null>(null);
+  const [selected, setSelected] = useState<(FoodSearchResult & { id?: string }) | null>(null);
   const [quantity, setQuantity] = useState("100");
   const [manual, setManual] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [manualForm, setManualForm] = useState({ name: "", cal: "", protein: "", carbs: "", fat: "" });
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<FavoriteFood[]>([]);
+  const [recent, setRecent] = useState<RecentFood[]>([]);
+
+  useEffect(() => {
+    api.get<FavoriteFood[]>("/food/favorites").then(setFavorites);
+    api.get<RecentFood[]>("/food/recent").then(setRecent);
+  }, []);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -111,16 +127,33 @@ function AddFoodPanel({
     }
   }
 
+  function pickKnownItem(item: FoodItem, defaultQuantity?: number) {
+    setSelected({ ...item, barcode: item.barcode ?? null, brand: item.brand ?? null, fiberPer100g: item.fiberPer100g ?? null });
+    setQuantity(String(defaultQuantity ?? 100));
+  }
+
   async function confirmSelected() {
     if (!selected || !quantity) return;
     const entry = await api.post<WithAchievements>("/food/log", {
       mealType,
       quantityGrams: Number(quantity),
-      foodItem: selected,
+      ...(selected.id ? { foodItemId: selected.id } : { foodItem: selected }),
       date: date.toISOString(),
     });
     emitAchievements(entry.newAchievements);
     onAdded();
+  }
+
+  async function toggleFavorite() {
+    if (!selected?.id) return;
+    const isFav = favorites.some((f) => f.foodItem.id === selected.id);
+    if (isFav) {
+      await api.delete(`/food/favorites/${selected.id}`);
+      setFavorites((prev) => prev.filter((f) => f.foodItem.id !== selected.id));
+    } else {
+      await api.post("/food/favorites", { foodItemId: selected.id });
+      setFavorites(await api.get<FavoriteFood[]>("/food/favorites"));
+    }
   }
 
   async function confirmManual() {
@@ -205,9 +238,16 @@ function AddFoodPanel({
         </div>
       ) : selected ? (
         <div className="space-y-2">
-          <p className="text-sm font-medium">
-            {selected.name} {selected.brand && <span className="text-gray-400">· {selected.brand}</span>}
-          </p>
+          <div className="flex justify-between items-start">
+            <p className="text-sm font-medium">
+              {selected.name} {selected.brand && <span className="text-gray-400">· {selected.brand}</span>}
+            </p>
+            {selected.id && (
+              <button className="text-lg leading-none shrink-0" onClick={toggleFavorite} type="button">
+                {favorites.some((f) => f.foodItem.id === selected.id) ? "★" : "☆"}
+              </button>
+            )}
+          </div>
           <p className="text-xs text-gray-400">
             {selected.caloriesPer100g} kcal / {selected.proteinPer100g}g eiwit per 100g
           </p>
@@ -243,6 +283,45 @@ function AddFoodPanel({
           </div>
           {searching && <p className="text-xs text-gray-400">Zoeken...</p>}
           {searchError && <p className="text-xs text-red-500">{searchError}</p>}
+
+          {!query.trim() && favorites.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-400 font-medium mb-1">★ Favorieten</p>
+              <div className="space-y-1">
+                {favorites.map((f) => (
+                  <button
+                    key={f.id}
+                    className="w-full text-left px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm"
+                    onClick={() => pickKnownItem(f.foodItem)}
+                  >
+                    <p className="font-medium">{f.foodItem.name}</p>
+                    <p className="text-xs text-gray-400">{Math.round(f.foodItem.caloriesPer100g)} kcal/100g</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!query.trim() && recent.length > 0 && (
+            <div>
+              <p className="text-xs text-gray-400 font-medium mb-1">↻ Recent</p>
+              <div className="space-y-1">
+                {recent.map((r, i) => (
+                  <button
+                    key={i}
+                    className="w-full text-left px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm"
+                    onClick={() => pickKnownItem(r.foodItem, r.lastQuantityGrams)}
+                  >
+                    <p className="font-medium">{r.foodItem.name}</p>
+                    <p className="text-xs text-gray-400">
+                      laatst {r.lastQuantityGrams}g · {Math.round(r.foodItem.caloriesPer100g)} kcal/100g
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="max-h-64 overflow-y-auto space-y-1">
             {results.map((r, i) => (
               <button

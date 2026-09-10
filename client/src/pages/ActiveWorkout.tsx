@@ -4,6 +4,10 @@ import { api } from "../api/client.js";
 import { Exercise, ProgramExercise, SetLog, WithAchievements, WorkoutSession } from "../api/types.js";
 import { Button, Card, Input, Spinner } from "../components/ui.js";
 import { emitAchievements } from "../lib/achievementBus.js";
+import RestTimer from "../components/RestTimer.js";
+import { calculatePlatesPerSide } from "../lib/plates.js";
+
+const DEFAULT_REST_SECONDS = 90;
 
 function SetRow({ set, onDelete }: { set: SetLog; onDelete: () => void }) {
   return (
@@ -37,6 +41,8 @@ function ExerciseBlock({
   const [weight, setWeight] = useState(target?.targetWeight ? String(target.targetWeight) : "");
   const [rpe, setRpe] = useState("");
   const [lastTime, setLastTime] = useState<SetLog[] | null>(null);
+  const [restKey, setRestKey] = useState<string | null>(null);
+  const [showPlates, setShowPlates] = useState(false);
 
   useEffect(() => {
     api.get<SetLog[]>(`/workouts/exercise/${exercise.id}/history`).then((h) => {
@@ -57,6 +63,7 @@ function ExerciseBlock({
     });
     emitAchievements(result.newAchievements);
     setRpe("");
+    setRestKey(result.id);
     onChange();
   }
 
@@ -116,6 +123,34 @@ function ExerciseBlock({
           Set {sets.length + 1}
         </Button>
       </form>
+      {weight && Number(weight) > 20 && (
+        <button
+          type="button"
+          className="text-xs text-gray-400 mt-1.5"
+          onClick={() => setShowPlates((v) => !v)}
+        >
+          🏋️ platen per kant {showPlates ? "▲" : "▼"}
+        </button>
+      )}
+      {showPlates && weight && (
+        <p className="text-xs text-gray-500 mt-1">
+          {(() => {
+            const plates = calculatePlatesPerSide(Number(weight));
+            return plates.length > 0
+              ? `${plates.join(" + ")}kg per kant (bar 20kg)`
+              : "Alleen de lege stang (20kg) nodig.";
+          })()}
+        </p>
+      )}
+      {restKey && (
+        <div className="mt-2">
+          <RestTimer
+            seconds={target?.restSeconds ?? DEFAULT_REST_SECONDS}
+            startKey={restKey}
+            onDone={() => {}}
+          />
+        </div>
+      )}
     </Card>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
-import { AiInsight, Exercise, ProgramDay, WorkoutProgram, WorkoutSuggestion } from "../api/types.js";
+import { AiInsight, Exercise, PlateauResult, ProgramDay, WorkoutProgram, WorkoutSuggestion } from "../api/types.js";
 import { Button, Card, Input, Spinner, EmptyState } from "../components/ui.js";
 
 function AddExerciseForm({ dayId, onAdded }: { dayId: string; onAdded: () => void }) {
@@ -161,6 +161,31 @@ function DayCard({ day, onChange }: { day: ProgramDay; onChange: () => void }) {
   );
 }
 
+function PlateauBanner({ program }: { program: WorkoutProgram }) {
+  const [plateaus, setPlateaus] = useState<PlateauResult[] | null>(null);
+
+  useEffect(() => {
+    api.get<PlateauResult[]>("/programs/plateaus").then(setPlateaus);
+  }, [program.id]);
+
+  if (!plateaus) return null;
+  const exerciseIds = new Set(program.days.flatMap((d) => d.exercises.map((pe) => pe.id)));
+  const relevant = plateaus.filter((p) => exerciseIds.has(p.programExerciseId));
+  if (relevant.length === 0) return null;
+
+  return (
+    <Card className="border-2 border-amber-200 bg-amber-50">
+      <p className="text-sm font-medium text-amber-800 mb-1">⚠️ Stilstand gedetecteerd</p>
+      {relevant.map((p) => (
+        <p key={p.programExerciseId} className="text-xs text-amber-700">
+          {p.exerciseName}: geen vooruitgang in {p.sessionsFlat} sessies ({p.weights.join("kg → ")}kg)
+        </p>
+      ))}
+      <p className="text-xs text-amber-600 mt-1">Gebruik &quot;Analyseer&quot; hieronder voor een concreet AI-advies.</p>
+    </Card>
+  );
+}
+
 function SuggestionsPanel() {
   const [insight, setInsight] = useState<AiInsight<{ suggestions: WorkoutSuggestion[] }> | null>(null);
   const [loading, setLoading] = useState(false);
@@ -276,6 +301,8 @@ export default function ProgramEditor() {
           Programma verwijderen
         </button>
       </div>
+
+      <PlateauBanner program={program} />
 
       <SuggestionsPanel />
 

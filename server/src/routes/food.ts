@@ -43,6 +43,53 @@ foodRouter.get("/barcode/:code", async (req, res) => {
   }
 });
 
+/** Distinct food items logged most recently, most recent first — lets the
+ * add-food flow skip searching for things you eat often. */
+foodRouter.get("/recent", async (req: AuthedRequest, res) => {
+  const entries = await prisma.foodLogEntry.findMany({
+    where: { userId: req.userId },
+    orderBy: { date: "desc" },
+    take: 60,
+    include: { foodItem: true },
+  });
+  const seen = new Set<string>();
+  const recent = [];
+  for (const e of entries) {
+    if (seen.has(e.foodItemId)) continue;
+    seen.add(e.foodItemId);
+    recent.push({ foodItem: e.foodItem, lastQuantityGrams: e.quantityGrams });
+    if (recent.length >= 12) break;
+  }
+  res.json(recent);
+});
+
+foodRouter.get("/favorites", async (req: AuthedRequest, res) => {
+  const favorites = await prisma.favoriteFood.findMany({
+    where: { userId: req.userId },
+    orderBy: { createdAt: "desc" },
+    include: { foodItem: true },
+  });
+  res.json(favorites.map((f) => ({ id: f.id, foodItem: f.foodItem })));
+});
+
+foodRouter.post("/favorites", async (req: AuthedRequest, res) => {
+  const foodItemId = typeof req.body?.foodItemId === "string" ? req.body.foodItemId : undefined;
+  if (!foodItemId) return res.status(400).json({ error: "foodItemId vereist" });
+  const favorite = await prisma.favoriteFood.upsert({
+    where: { userId_foodItemId: { userId: req.userId!, foodItemId } },
+    update: {},
+    create: { userId: req.userId!, foodItemId },
+  });
+  res.status(201).json(favorite);
+});
+
+foodRouter.delete("/favorites/:foodItemId", async (req: AuthedRequest, res) => {
+  await prisma.favoriteFood.deleteMany({
+    where: { userId: req.userId, foodItemId: req.params.foodItemId },
+  });
+  res.json({ ok: true });
+});
+
 foodRouter.get("/search", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!q) return res.json([]);

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
 import { checkAndUnlockAchievements } from "../gamification/achievements.js";
+import { detectPlateaus } from "../lib/plateau.js";
 
 export const programsRouter = Router();
 
@@ -13,6 +14,11 @@ programsRouter.get("/", async (req: AuthedRequest, res) => {
     include: { days: { include: { exercises: true } } },
   });
   res.json(programs);
+});
+
+// Must be registered before "/:id" — otherwise the param route would swallow this path.
+programsRouter.get("/plateaus", async (req: AuthedRequest, res) => {
+  res.json(await detectPlateaus(req.userId!));
 });
 
 programsRouter.get("/:id", async (req: AuthedRequest, res) => {
@@ -42,6 +48,71 @@ programsRouter.post("/", async (req: AuthedRequest, res) => {
   });
   const newAchievements = await checkAndUnlockAchievements(req.userId!);
   res.status(201).json({ ...program, newAchievements });
+});
+
+const importSchema = z.object({
+  programName: z.string().min(1),
+  days: z.array(
+    z.object({
+      name: z.string().min(1),
+      exercises: z.array(
+        z.object({
+          exerciseName: z.string().min(1),
+          targetSets: z.number().int().min(1),
+          targetRepsMin: z.number().int().min(1),
+          targetRepsMax: z.number().int().min(1),
+          targetWeight: z.number().optional(),
+        })
+      ),
+    })
+  ),
+});
+
+/** Saves an AI-parsed program (see /api/ai/program/parse), resolving each
+ * exercise name to an existing Exercise or creating a new custom one. */
+programsRouter.post("/import", async (req: AuthedRequest, res) => {
+  const parsed = importSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const allExercises = await prisma.exercise.findMany();
+  const byLowerName = new Map(allExercises.map((e) => [e.name.toLowerCase(), e]));
+
+  async function resolveExercise(name: string) {
+    const existing = byLowerName.get(name.toLowerCase());
+    if (existing) return existing;
+    const created = await prisma.exercise.create({
+      data: { name, muscleGroup: "Overig", isCustom: true },
+    });
+    byLowerName.set(name.toLowerCase(), created);
+    return created;
+  }
+
+  const program = await prisma.workoutProgram.create({
+    data: { userId: req.userId!, name: parsed.data.programName },
+  });
+
+  for (const [dayIndex, day] of parsed.data.days.entries()) {
+    const createdDay = await prisma.programDay.create({
+      data: { programId: program.id, name: day.name, order: dayIndex },
+    });
+    for (const [exIndex, ex] of day.exercises.entries()) {
+      const exercise = await resolveExercise(ex.exerciseName);
+      await prisma.programExercise.create({
+        data: {
+          programDayId: createdDay.id,
+          exerciseId: exercise.id,
+          order: exIndex,
+          targetSets: ex.targetSets,
+          targetRepsMin: ex.targetRepsMin,
+          targetRepsMax: ex.targetRepsMax,
+          targetWeight: ex.targetWeight,
+        },
+      });
+    }
+  }
+
+  const newAchievements = await checkAndUnlockAchievements(req.userId!);
+  res.status(201).json({ id: program.id, newAchievements });
 });
 
 programsRouter.patch("/:id", async (req: AuthedRequest, res) => {
