@@ -64,6 +64,7 @@ function LogRecipeForm({ recipe, onLogged }: { recipe: Recipe; onLogged: () => v
 
 export default function Recipes() {
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [servings, setServings] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
@@ -192,16 +193,33 @@ export default function Recipes() {
         recipes.map((r) => (
           <Card key={r.id}>
             <div className="flex justify-between items-start">
-              <div>
-                <p className="font-semibold">{r.name}</p>
-                <p className="text-xs text-gray-400">
-                  {Math.round(r.caloriesPerServing)} kcal · {Math.round(r.proteinPerServing)}g eiwit per portie
+              <button className="text-left flex-1" onClick={() => setExpanded(expanded === r.id ? null : r.id)}>
+                <p className="font-semibold">
+                  {r.name} <span className="text-gray-300 text-xs">{expanded === r.id ? "▲" : "▼"}</span>
                 </p>
-              </div>
-              <button className="text-xs text-red-500" onClick={() => deleteRecipe(r.id)}>
+                <p className="text-xs text-gray-400">
+                  {Math.round(r.caloriesPerServing)} kcal · {Math.round(r.proteinPerServing)}g eiwit per portie ·{" "}
+                  {r.servings} porties
+                </p>
+              </button>
+              <button className="text-xs text-red-500 shrink-0" onClick={() => deleteRecipe(r.id)}>
                 verwijderen
               </button>
             </div>
+            {expanded === r.id && (
+              <div className="mt-2 space-y-1 border-t border-gray-100 pt-2">
+                {r.ingredients.map((ing, i) => (
+                  <p key={i} className="text-xs text-gray-500">
+                    {ing.name} — {ing.quantity} ({Math.round(ing.estimatedCalories)} kcal)
+                  </p>
+                ))}
+                <p className="text-xs text-gray-600 pt-1">
+                  Totaal: {Math.round(r.caloriesPerServing * r.servings)} kcal ·{" "}
+                  {Math.round(r.proteinPerServing * r.servings)}g eiwit · {Math.round(r.carbsPerServing * r.servings)}g
+                  koolh. · {Math.round(r.fatPerServing * r.servings)}g vet
+                </p>
+              </div>
+            )}
             <LogRecipeForm recipe={r} onLogged={load} />
           </Card>
         ))

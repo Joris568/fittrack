@@ -162,6 +162,51 @@ foodRouter.get("/log", async (req: AuthedRequest, res) => {
   res.json(entries);
 });
 
+const copySchema = z.object({
+  mealType: z.enum(["breakfast", "lunch", "dinner", "snack"]),
+  fromDate: z.string().datetime(),
+  toDate: z.string().datetime(),
+});
+
+/** Copies every food-log entry for one meal on one day onto another day —
+ * e.g. "pak lunch van gisteren en zet die ook op vandaag". */
+foodRouter.post("/log/copy", async (req: AuthedRequest, res) => {
+  const parsed = copySchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const from = new Date(parsed.data.fromDate);
+  const start = new Date(from);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(from);
+  end.setHours(23, 59, 59, 999);
+
+  const sourceEntries = await prisma.foodLogEntry.findMany({
+    where: { userId: req.userId, mealType: parsed.data.mealType, date: { gte: start, lte: end } },
+  });
+  if (sourceEntries.length === 0) {
+    return res.status(404).json({ error: "Geen items gevonden om te kopiëren." });
+  }
+
+  const toDate = new Date(parsed.data.toDate);
+  const created = await Promise.all(
+    sourceEntries.map((e) =>
+      prisma.foodLogEntry.create({
+        data: {
+          userId: req.userId!,
+          foodItemId: e.foodItemId,
+          mealType: e.mealType,
+          quantityGrams: e.quantityGrams,
+          date: toDate,
+        },
+        include: { foodItem: true },
+      })
+    )
+  );
+
+  const newAchievements = await checkAndUnlockAchievements(req.userId!);
+  res.status(201).json({ entries: created, newAchievements });
+});
+
 foodRouter.get("/log/summary", async (req: AuthedRequest, res) => {
   const days = req.query.days ? Number(req.query.days) : 14;
   const start = new Date();

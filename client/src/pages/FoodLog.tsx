@@ -272,6 +272,9 @@ export default function FoodLog() {
   const [entries, setEntries] = useState<FoodLogEntry[] | null>(null);
   const [goal, setGoal] = useState<NutritionGoal | null>(null);
   const [addingMeal, setAddingMeal] = useState<FoodLogEntry["mealType"] | null>(null);
+  const [copyingMeal, setCopyingMeal] = useState<FoodLogEntry["mealType"] | null>(null);
+  const [copySourceDate, setCopySourceDate] = useState("");
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setEntries(null);
@@ -290,6 +293,31 @@ export default function FoodLog() {
   async function removeEntry(id: string) {
     await api.delete(`/food/log/${id}`);
     load();
+  }
+
+  function openCopy(meal: FoodLogEntry["mealType"]) {
+    const yesterday = new Date(date);
+    yesterday.setDate(yesterday.getDate() - 1);
+    setCopySourceDate(toDateKey(yesterday));
+    setCopyError(null);
+    setCopyingMeal(meal);
+  }
+
+  async function confirmCopy() {
+    if (!copyingMeal || !copySourceDate) return;
+    setCopyError(null);
+    try {
+      const result = await api.post<WithAchievements>("/food/log/copy", {
+        mealType: copyingMeal,
+        fromDate: new Date(copySourceDate + "T12:00:00").toISOString(),
+        toDate: date.toISOString(),
+      });
+      emitAchievements(result.newAchievements);
+      setCopyingMeal(null);
+      load();
+    } catch (err) {
+      setCopyError(err instanceof Error ? err.message : "Kopiëren mislukt");
+    }
   }
 
   function shiftDay(deltaDays: number) {
@@ -371,10 +399,38 @@ export default function FoodLog() {
           <Card key={meal.key}>
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-semibold">{meal.label}</h3>
-              <button className="text-xs text-brand-600 font-medium" onClick={() => setAddingMeal(meal.key)}>
-                + toevoegen
-              </button>
+              <div className="flex items-center gap-3">
+                <button className="text-xs text-gray-400 font-medium" onClick={() => openCopy(meal.key)}>
+                  ↻ kopieer
+                </button>
+                <button className="text-xs text-brand-600 font-medium" onClick={() => setAddingMeal(meal.key)}>
+                  + toevoegen
+                </button>
+              </div>
             </div>
+            {copyingMeal === meal.key && (
+              <div className="bg-gray-50 rounded-lg px-3 py-2 mb-2 space-y-2">
+                <p className="text-xs text-gray-500">
+                  Kopieer {meal.label.toLowerCase()} van een andere dag naar {formatDayLabel(date).toLowerCase()}:
+                </p>
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="date"
+                    value={copySourceDate}
+                    max={toDateKey(new Date())}
+                    onChange={(e) => setCopySourceDate(e.target.value)}
+                    className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 flex-1"
+                  />
+                  <Button className="!px-3 !py-1.5 text-sm" onClick={confirmCopy}>
+                    Kopieer
+                  </Button>
+                  <button className="text-xs text-gray-400" onClick={() => setCopyingMeal(null)}>
+                    annuleren
+                  </button>
+                </div>
+                {copyError && <p className="text-xs text-red-500">{copyError}</p>}
+              </div>
+            )}
             {mealEntries.length === 0 ? (
               <p className="text-xs text-gray-400">Nog niets gelogd.</p>
             ) : (
