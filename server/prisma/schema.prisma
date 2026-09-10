@@ -2,8 +2,11 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Local dev uses sqlite for zero-setup previews. The production build
+// (render.yaml) switches this to postgresql via `npm run db:use-postgres`
+// before generating the client — never edit this by hand for deployment.
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 

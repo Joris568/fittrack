@@ -90,6 +90,7 @@ function ExerciseBlock({
         <Input
           type="number"
           inputMode="decimal"
+          step="0.1"
           placeholder="kg"
           value={weight}
           onChange={(e) => setWeight(e.target.value)}

@@ -69,12 +69,16 @@ export default function SettingsPage() {
         <form onSubmit={addMetric} className="flex gap-2">
           <Input
             type="number"
+            inputMode="decimal"
+            step="0.1"
             placeholder="Gewicht (kg)"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
           />
           <Input
             type="number"
+            inputMode="decimal"
+            step="0.1"
             placeholder="Vet % (optioneel)"
             value={bodyFat}
             onChange={(e) => setBodyFat(e.target.value)}

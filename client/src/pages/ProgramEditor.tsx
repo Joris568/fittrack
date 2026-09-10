@@ -91,6 +91,8 @@ function AddExerciseForm({ dayId, onAdded }: { dayId: string; onAdded: () => voi
           </div>
           <Input
             type="number"
+            inputMode="decimal"
+            step="0.1"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
             placeholder="Startgewicht (kg, optioneel)"

@@ -8,8 +8,13 @@ function required(name: string): string {
   return value;
 }
 
+// In production (Render) PORT is injected by the platform and must be respected.
+// In local dev, ignore any inherited PORT (e.g. from a dev-preview harness meant
+// for the Vite client) so the API always binds to a fixed, predictable port.
+const isProduction = process.env.NODE_ENV === "production";
+
 export const env = {
-  port: Number(process.env.PORT ?? 4000),
+  port: Number((isProduction ? process.env.PORT : undefined) ?? 4000),
   databaseUrl: required("DATABASE_URL"),
   appPassword: required("APP_PASSWORD"),
   jwtSecret: required("JWT_SECRET"),
