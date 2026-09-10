@@ -20,6 +20,7 @@ model User {
   foodLogs      FoodLogEntry[]
   goals         NutritionGoal[]
   bodyMetrics   BodyMetric[]
+  recipes       Recipe[]
   insights      AiInsight[]
   chatMessages  ChatMessage[]
   achievements  Achievement[]
@@ -122,8 +123,26 @@ model FoodItem {
   createdAt     DateTime @default(now())
 
   logEntries FoodLogEntry[]
+  recipe     Recipe?
 
   @@index([name])
+}
+
+model Recipe {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+  name               String
+  sourceText         String
+  servings           Int
+  caloriesPerServing Float
+  proteinPerServing  Float
+  carbsPerServing    Float
+  fatPerServing      Float
+  ingredients        String   // JSON-encoded array of {name, quantity, estimatedCalories}
+  foodItemId         String?  @unique
+  foodItem           FoodItem? @relation(fields: [foodItemId], references: [id])
+  createdAt          DateTime @default(now())
 }
 
 model FoodLogEntry {

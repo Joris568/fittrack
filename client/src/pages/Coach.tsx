@@ -10,7 +10,16 @@ export default function Coach() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.get<ChatMessage[]>("/ai/chat").then(setMessages);
+    (async () => {
+      const history = await api.get<ChatMessage[]>("/ai/chat");
+      setMessages(history);
+      try {
+        const checkin = await api.post<ChatMessage | null>("/ai/chat/checkin");
+        if (checkin) setMessages((prev) => [...(prev ?? []), checkin]);
+      } catch {
+        // Proactive check-in is a nice-to-have — silently skip if it fails.
+      }
+    })();
   }, []);
 
   useEffect(() => {

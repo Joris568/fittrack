@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { api } from "../api/client.js";
-import { FoodLogEntry, FoodSearchResult, NutritionGoal, WithAchievements } from "../api/types.js";
-import { Button, Card, Input, Spinner, EmptyState, PageTitle } from "../components/ui.js";
+import { FoodLogEntry, FoodSearchResult, NutritionDaySummary, NutritionGoal, WithAchievements } from "../api/types.js";
+import { Button, Card, Input, Spinner, PageTitle } from "../components/ui.js";
 import { emitAchievements } from "../lib/achievementBus.js";
+import BarcodeScanner from "../components/BarcodeScanner.js";
 
 const MEAL_TYPES: { key: FoodLogEntry["mealType"]; label: string }[] = [
   { key: "breakfast", label: "Ontbijt" },
@@ -12,13 +14,68 @@ const MEAL_TYPES: { key: FoodLogEntry["mealType"]; label: string }[] = [
   { key: "snack", label: "Snack" },
 ];
 
-function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["mealType"]; onAdded: () => void; onClose: () => void }) {
+function toDateKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDayLabel(d: Date): string {
+  const today = toDateKey(new Date());
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const key = toDateKey(d);
+  if (key === today) return "Vandaag";
+  if (key === toDateKey(yesterday)) return "Gisteren";
+  return d.toLocaleDateString("nl-NL", { weekday: "long", day: "numeric", month: "long" });
+}
+
+function NutritionTrendChart({ goal }: { goal: NutritionGoal | null }) {
+  const [data, setData] = useState<NutritionDaySummary[] | null>(null);
+
+  useEffect(() => {
+    api.get<NutritionDaySummary[]>("/food/log/summary?days=14").then(setData);
+  }, []);
+
+  if (!data || data.every((d) => d.cal === 0)) return null;
+
+  const chartData = data.map((d) => ({
+    date: new Date(d.date).toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit" }),
+    kcal: Math.round(d.cal),
+  }));
+
+  return (
+    <Card>
+      <h2 className="font-semibold mb-2">Calorieën (laatste 14 dagen)</h2>
+      <ResponsiveContainer width="100%" height={160}>
+        <BarChart data={chartData}>
+          <XAxis dataKey="date" fontSize={10} interval={1} />
+          <YAxis fontSize={10} width={30} />
+          <Tooltip />
+          {goal && <ReferenceLine y={goal.calories} stroke="#94a3b8" strokeDasharray="4 4" />}
+          <Bar dataKey="kcal" fill="#16b862" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </Card>
+  );
+}
+
+function AddFoodPanel({
+  mealType,
+  date,
+  onAdded,
+  onClose,
+}: {
+  mealType: FoodLogEntry["mealType"];
+  date: Date;
+  onAdded: () => void;
+  onClose: () => void;
+}) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [selected, setSelected] = useState<FoodSearchResult | null>(null);
   const [quantity, setQuantity] = useState("100");
   const [manual, setManual] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [manualForm, setManualForm] = useState({ name: "", cal: "", protein: "", carbs: "", fat: "" });
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -34,7 +91,7 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
       try {
         const res = await api.get<FoodSearchResult[]>(`/food/search?q=${encodeURIComponent(query)}`);
         setResults(res);
-      } catch (err) {
+      } catch {
         setSearchError("Voedseldatabase niet bereikbaar, probeer het nog eens.");
       } finally {
         setSearching(false);
@@ -43,12 +100,24 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
     return () => clearTimeout(t);
   }, [query]);
 
+  async function handleBarcodeDetected(code: string) {
+    setScanning(false);
+    setSearchError(null);
+    try {
+      const item = await api.get<FoodSearchResult>(`/food/barcode/${encodeURIComponent(code)}`);
+      setSelected(item);
+    } catch {
+      setSearchError("Geen product gevonden voor deze barcode. Probeer te zoeken op naam.");
+    }
+  }
+
   async function confirmSelected() {
     if (!selected || !quantity) return;
     const entry = await api.post<WithAchievements>("/food/log", {
       mealType,
       quantityGrams: Number(quantity),
       foodItem: selected,
+      date: date.toISOString(),
     });
     emitAchievements(entry.newAchievements);
     onAdded();
@@ -67,6 +136,7 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
       mealType,
       quantityGrams: Number(quantity || 100),
       foodItemId: item.id,
+      date: date.toISOString(),
     });
     emitAchievements(entry.newAchievements);
     onAdded();
@@ -80,6 +150,10 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
           annuleren
         </button>
       </div>
+
+      {scanning && (
+        <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
+      )}
 
       {manual ? (
         <div className="space-y-2">
@@ -155,7 +229,18 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
         </div>
       ) : (
         <div className="space-y-2">
-          <Input placeholder="Zoek product..." value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+          <div className="flex gap-2">
+            <Input
+              placeholder="Zoek product..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              className="flex-1"
+            />
+            <Button variant="secondary" className="!px-3 shrink-0" onClick={() => setScanning(true)}>
+              📷 Scan
+            </Button>
+          </div>
           {searching && <p className="text-xs text-gray-400">Zoeken...</p>}
           {searchError && <p className="text-xs text-red-500">{searchError}</p>}
           <div className="max-h-64 overflow-y-auto space-y-1">
@@ -183,27 +268,39 @@ function AddFoodPanel({ mealType, onAdded, onClose }: { mealType: FoodLogEntry["
 }
 
 export default function FoodLog() {
+  const [date, setDate] = useState(() => new Date());
   const [entries, setEntries] = useState<FoodLogEntry[] | null>(null);
   const [goal, setGoal] = useState<NutritionGoal | null>(null);
   const [addingMeal, setAddingMeal] = useState<FoodLogEntry["mealType"] | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
+    setEntries(null);
     const [e, g] = await Promise.all([
-      api.get<FoodLogEntry[]>("/food/log"),
+      api.get<FoodLogEntry[]>(`/food/log?date=${toDateKey(date)}`),
       api.get<NutritionGoal | null>("/goals/current"),
     ]);
     setEntries(e);
     setGoal(g);
-  }
+  }, [date]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   async function removeEntry(id: string) {
     await api.delete(`/food/log/${id}`);
     load();
   }
+
+  function shiftDay(deltaDays: number) {
+    setDate((d) => {
+      const next = new Date(d);
+      next.setDate(next.getDate() + deltaDays);
+      return next;
+    });
+  }
+
+  const isToday = toDateKey(date) === toDateKey(new Date());
 
   if (!entries) return <Spinner />;
 
@@ -220,10 +317,38 @@ export default function FoodLog() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <PageTitle>Eten vandaag</PageTitle>
-        <Link to="/eat/goals" className="text-sm text-brand-600 font-medium">
-          Doelen
-        </Link>
+        <PageTitle>Eten</PageTitle>
+        <div className="flex items-center gap-3">
+          <Link to="/eat/recipes" className="text-sm text-brand-600 font-medium">
+            Recepten
+          </Link>
+          <Link to="/eat/goals" className="text-sm text-brand-600 font-medium">
+            Doelen
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <button className="text-lg px-2 py-1 text-gray-400" onClick={() => shiftDay(-1)} aria-label="Vorige dag">
+          ‹
+        </button>
+        <div className="flex flex-col items-center">
+          <span className="font-medium text-sm">{formatDayLabel(date)}</span>
+          <input
+            type="date"
+            value={toDateKey(date)}
+            onChange={(e) => e.target.value && setDate(new Date(e.target.value + "T12:00:00"))}
+            className="text-xs text-gray-400 bg-transparent"
+          />
+        </div>
+        <button
+          className="text-lg px-2 py-1 text-gray-400 disabled:opacity-20"
+          onClick={() => shiftDay(1)}
+          disabled={isToday}
+          aria-label="Volgende dag"
+        >
+          ›
+        </button>
       </div>
 
       <Card>
@@ -237,6 +362,8 @@ export default function FoodLog() {
           </span>
         </div>
       </Card>
+
+      {isToday && <NutritionTrendChart goal={goal} />}
 
       {MEAL_TYPES.map((meal) => {
         const mealEntries = entries.filter((e) => e.mealType === meal.key);
@@ -273,6 +400,7 @@ export default function FoodLog() {
               <div className="mt-2">
                 <AddFoodPanel
                   mealType={meal.key}
+                  date={date}
                   onAdded={() => {
                     setAddingMeal(null);
                     load();

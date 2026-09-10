@@ -164,3 +164,51 @@ export interface GamificationSummary {
 export interface WithAchievements {
   newAchievements: UnlockedAchievement[];
 }
+
+export interface NutritionDaySummary {
+  date: string;
+  cal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface Recipe {
+  id: string;
+  name: string;
+  servings: number;
+  caloriesPerServing: number;
+  proteinPerServing: number;
+  carbsPerServing: number;
+  fatPerServing: number;
+  ingredients: RecipeIngredient[];
+  foodItemId: string | null;
+  createdAt: string;
+}
+
+export interface ParsedRecipe {
+  name: string;
+  servings: number;
+  ingredients: RecipeIngredient[];
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+}
+
+export interface RecipeIngredient {
+  name: string;
+  quantity: string;
+  estimatedCalories: number;
+}
+
+export interface GoalProposalContent {
+  challenge: string;
+  reasoning: string;
+  proposedGoal: {
+    calories: number;
+    proteinGrams: number;
+    carbsGrams: number;
+    fatGrams: number;
+  };
+}

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api } from "../api/client.js";
 import { BodyMetric, GamificationSummary } from "../api/types.js";
 import { useAuth } from "../context/AuthContext.js";
@@ -38,6 +39,17 @@ export default function SettingsPage() {
     await logout();
     navigate("/login");
   }
+
+  const weightChartData = useMemo(
+    () =>
+      [...metrics]
+        .reverse()
+        .map((m) => ({
+          date: new Date(m.date).toLocaleDateString("nl-NL", { day: "2-digit", month: "2-digit" }),
+          weight: m.weightKg,
+        })),
+    [metrics]
+  );
 
   return (
     <div className="space-y-4">
@@ -85,6 +97,24 @@ export default function SettingsPage() {
           />
           <Button type="submit">Log</Button>
         </form>
+        {weightChartData.length > 1 && (
+          <ResponsiveContainer width="100%" height={160} className="mt-3">
+            <LineChart data={weightChartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
+              <XAxis dataKey="date" fontSize={10} />
+              <YAxis fontSize={10} width={35} domain={["dataMin - 1", "dataMax + 1"]} />
+              <Tooltip />
+              <Line
+                type="monotone"
+                dataKey="weight"
+                stroke="#16b862"
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
         {metrics.length > 0 && (
           <div className="mt-3 space-y-1">
             {metrics.slice(0, 5).map((m) => (

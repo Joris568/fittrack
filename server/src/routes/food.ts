@@ -13,6 +13,36 @@ interface OffProduct {
   nutriments?: Record<string, number>;
 }
 
+function mapOffProduct(p: OffProduct) {
+  return {
+    barcode: p.code ?? null,
+    name: p.product_name!,
+    brand: p.brands ?? null,
+    caloriesPer100g: p.nutriments!["energy-kcal_100g"] ?? 0,
+    proteinPer100g: p.nutriments!["proteins_100g"] ?? 0,
+    carbsPer100g: p.nutriments!["carbohydrates_100g"] ?? 0,
+    fatPer100g: p.nutriments!["fat_100g"] ?? 0,
+    fiberPer100g: p.nutriments!["fiber_100g"] ?? null,
+  };
+}
+
+foodRouter.get("/barcode/:code", async (req, res) => {
+  const code = req.params.code.trim();
+  try {
+    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`, {
+      headers: { "User-Agent": "FitTrack-PersonalApp/1.0" },
+    });
+    const data = (await response.json()) as { status?: number; product?: OffProduct };
+    if (!data.product || !data.product.product_name || data.product.nutriments?.["energy-kcal_100g"] == null) {
+      return res.status(404).json({ error: "Product niet gevonden voor deze barcode." });
+    }
+    res.json(mapOffProduct(data.product));
+  } catch (err) {
+    console.error("OpenFoodFacts barcode lookup failed", err);
+    res.status(502).json({ error: "Voedseldatabase niet bereikbaar" });
+  }
+});
+
 foodRouter.get("/search", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!q) return res.json([]);
@@ -33,16 +63,7 @@ foodRouter.get("/search", async (req, res) => {
     const data = (await response.json()) as { products?: OffProduct[] };
     const results = (data.products ?? [])
       .filter((p) => p.product_name && p.nutriments?.["energy-kcal_100g"] != null)
-      .map((p) => ({
-        barcode: p.code ?? null,
-        name: p.product_name!,
-        brand: p.brands ?? null,
-        caloriesPer100g: p.nutriments!["energy-kcal_100g"] ?? 0,
-        proteinPer100g: p.nutriments!["proteins_100g"] ?? 0,
-        carbsPer100g: p.nutriments!["carbohydrates_100g"] ?? 0,
-        fatPer100g: p.nutriments!["fat_100g"] ?? 0,
-        fiberPer100g: p.nutriments!["fiber_100g"] ?? null,
-      }));
+      .map(mapOffProduct);
     res.json(results);
   } catch (err) {
     console.error("OpenFoodFacts search failed", err);
@@ -139,6 +160,40 @@ foodRouter.get("/log", async (req: AuthedRequest, res) => {
     orderBy: { date: "asc" },
   });
   res.json(entries);
+});
+
+foodRouter.get("/log/summary", async (req: AuthedRequest, res) => {
+  const days = req.query.days ? Number(req.query.days) : 14;
+  const start = new Date();
+  start.setDate(start.getDate() - (days - 1));
+  start.setHours(0, 0, 0, 0);
+
+  const entries = await prisma.foodLogEntry.findMany({
+    where: { userId: req.userId, date: { gte: start } },
+    include: { foodItem: true },
+  });
+
+  const byDay = new Map<string, { cal: number; protein: number; carbs: number; fat: number }>();
+  for (const entry of entries) {
+    const key = entry.date.toISOString().slice(0, 10);
+    const factor = entry.quantityGrams / 100;
+    const totals = byDay.get(key) ?? { cal: 0, protein: 0, carbs: 0, fat: 0 };
+    totals.cal += entry.foodItem.caloriesPer100g * factor;
+    totals.protein += entry.foodItem.proteinPer100g * factor;
+    totals.carbs += entry.foodItem.carbsPer100g * factor;
+    totals.fat += entry.foodItem.fatPer100g * factor;
+    byDay.set(key, totals);
+  }
+
+  const result = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const totals = byDay.get(key) ?? { cal: 0, protein: 0, carbs: 0, fat: 0 };
+    result.push({ date: key, ...totals });
+  }
+  res.json(result);
 });
 
 foodRouter.delete("/log/:id", async (req: AuthedRequest, res) => {
