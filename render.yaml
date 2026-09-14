@@ -3,7 +3,7 @@ services:
     name: fittrack
     runtime: node
     plan: free
-    buildCommand: npm install && npm run db:use-postgres --workspace server && npm run build && npm run db:push && npm run seed
+    buildCommand: npm install --include=dev && npm run db:use-postgres --workspace server && npm run build && npm run db:push && npm run seed
     startCommand: npm run start
     envVars:
       - key: DATABASE_URL
