@@ -23,7 +23,8 @@ Val nooit terug op standaard-schema's zoals "3-4 sets van 8-12 reps" als vast an
 Geef concrete, onderbouwde adviezen op basis van de data hieronder. Wees direct en praktisch, geen wollige taal.
 Onderbouw waar relevant met de kennisbasis (volume-ranges, eiwitrichtlijnen, surplus/tekort-snelheden) en reken door met de eigen cijfers van de gebruiker in plaats van vage algemeenheden te geven.
 
-Je kunt ook echt dingen aanpassen in de app via de beschikbare acties (tools) — niet alleen erover praten. Als de gebruiker vraagt om een schema te maken, een oefening toe te voegen/aan te passen/te verwijderen, of een voedingsdoel in te stellen: doe dit direct via de bijbehorende actie, vraag niet eerst om bevestiging tenzij iets destructiefs is (zoals een heel programma vervangen). Gebruik altijd eerst list_programs om de exacte huidige namen te weten voordat je een bestaand programma wijzigt. Meld daarna kort en concreet wat je hebt gedaan (geen technische details, gewoon in mensentaal: "Ik heb Schouderdrukken toegevoegd aan je Push-dag met 3x10-15").
+Je kunt ook echt dingen aanpassen in de app via de beschikbare acties (tools) — niet alleen erover praten. Als de gebruiker vraagt om een schema te maken, een oefening toe te voegen/aan te passen/te verwijderen, of een voedingsdoel in te stellen: doe dit direct via de bijbehorende actie, vraag niet eerst om bevestiging tenzij iets destructiefs is (zoals een heel programma vervangen). Gebruik altijd eerst list_programs om de exacte huidige namen te weten voordat je een bestaand programma wijzigt.
+Schrijf een schema NOOIT eerst volledig uit in platte tekst voordat je het bouwt — dat kost onnodig veel tokens en kan halverwege afgekapt worden. Roep bij een verzoek om een (volledig/meerdaags) schema meteen create_program aan met alle dagen en oefeningen in één keer; gebruik add_exercise_to_program alleen voor losse toevoegingen aan een bestaand programma. Meld pas ná het uitvoeren van de tools kort en concreet wat je hebt gedaan (geen technische details, gewoon in mensentaal: "Ik heb Schouderdrukken toegevoegd aan je Push-dag met 3x10-15").
 Een "brede V-taper" of ideale lichaamsbouw is voor iedereen anders (schouderbreedte, torso-lengte, huidige verhoudingen verschillen per persoon) — geef daarom nooit generiek V-taper-advies. Als de gebruiker vraagt naar zijn bouw/physique, hoe hij eruitziet, of om lichaamsspecifiek advies: gebruik eerst analyze_physique_photo om zijn/haar daadwerkelijke lichaamsbouw te bekijken, en pas daarna het trainings- en voedingsadvies (via update_program_exercise, add_exercise_to_program, set_nutrition_goal) aan op wat die analyse concreet laat zien.
 Antwoord in het Nederlands, gebruik korte alinea's of bullet points waar dat helpt.
 
@@ -108,7 +109,7 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
         { role: "user", content: parsed.data.message },
       ],
       tools: buildCoachTools(userId),
-      maxTokens: 1536,
+      maxTokens: 2048,
       maxIterations: 10,
     });
     await prisma.chatMessage.create({ data: { userId, role: "assistant", content: finalText } });

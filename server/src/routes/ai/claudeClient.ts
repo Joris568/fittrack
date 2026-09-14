@@ -148,6 +148,19 @@ export async function callClaudeWithTools(params: {
     if (toolUses.length === 0) {
       const textBlock = response.content.find((b) => b.type === "text");
       const text = textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+      // If Claude was cut off by the token limit while still writing plain text (e.g.
+      // typing out a whole program in prose instead of calling the tools), don't show
+      // the reader a sentence that stops mid-word — push what it wrote so far and nudge
+      // it to actually build the thing via tools instead of describing it.
+      if (text && response.stop_reason === "max_tokens") {
+        messages.push({ role: "assistant", content: response.content });
+        messages.push({
+          role: "user",
+          content:
+            "Je antwoord werd afgebroken door de lengtelimiet. Stop met het uitschrijven van het schema in platte tekst — gebruik nu direct de tools (create_program/add_exercise_to_program) om het echt aan te maken, en geef pas daarna een korte samenvatting.",
+        });
+        continue;
+      }
       if (text) return { finalText: text, actionsTaken };
       // Claude sometimes ends a tool-use turn without any closing text at all.
       // Rather than show an empty bubble, force one more plain-text turn asking
