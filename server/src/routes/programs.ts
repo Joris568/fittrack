@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
 import { checkAndUnlockAchievements } from "../gamification/achievements.js";
 import { detectPlateaus } from "../lib/plateau.js";
+import { makeExerciseResolver } from "../lib/exerciseResolver.js";
 
 export const programsRouter = Router();
 
@@ -74,18 +75,7 @@ programsRouter.post("/import", async (req: AuthedRequest, res) => {
   const parsed = importSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const allExercises = await prisma.exercise.findMany();
-  const byLowerName = new Map(allExercises.map((e) => [e.name.toLowerCase(), e]));
-
-  async function resolveExercise(name: string) {
-    const existing = byLowerName.get(name.toLowerCase());
-    if (existing) return existing;
-    const created = await prisma.exercise.create({
-      data: { name, muscleGroup: "Overig", isCustom: true },
-    });
-    byLowerName.set(name.toLowerCase(), created);
-    return created;
-  }
+  const resolveExercise = makeExerciseResolver();
 
   const program = await prisma.workoutProgram.create({
     data: { userId: req.userId!, name: parsed.data.programName },

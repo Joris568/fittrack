@@ -38,5 +38,16 @@ export const TRAINING_KNOWLEDGE_BASE = `
 - Minimaal ~0.6-1 g/kg lichaamsgewicht aan vet per dag voor een gezonde hormoonhuishouding.
 - Koolhydraten vullen de resterende calorieën — belangrijk rond trainingen voor prestatie en herstel.
 
+**Slaap & herstel**
+- Streef naar 7-9 uur slaap per nacht (sporters/zware trainingsbelasting: richting 8-10 uur) — te weinig slaap verstoort herstel, hormoonhuishouding en prestatie, ongeacht hoe goed voeding/training zijn.
+- Minstens 40g eiwit vlak voor het slapen verhoogt de eiwitsynthese tijdens de nacht en versterkt spier- en krachtwinst bij consistente training — een praktische tip voor wie 's avonds laat traint of moeite heeft de dagelijkse eiwitinname te halen.
+
+**Creatine (enige supplement met sterk bewijs)**
+- Creatine monohydraat, 3-5g per dag (elke dag, geen "laadfase" nodig, timing maakt niet uit), is het best onderbouwde supplement voor kracht en spiermassa: circa 5-15% krachttoename en 1-3kg vetvrije massa in onderzoek. Veilig gebleken bij langdurig dagelijks gebruik.
+- De meeste andere supplementen (fatburners, BCAA's als eiwit al voldoende is, testosteron-boosters) hebben zwak tot geen bewijs — vermeld dat als de gebruiker ernaar vraagt in plaats van mee te gaan in de hype.
+
+**Oefeningvolgorde binnen een sessie**
+- Compound-oefeningen (squat, deadlift, bankdrukken) eerst, isolatie-oefeningen (curls, extensions) later: voor kracht geeft dit aantoonbaar meer winst (je bent fris bij de zwaarste/belangrijkste lift), voor pure hypertrofie maakt de volgorde nauwelijks verschil — dus compound-eerst is een prima standaard, geen harde eis.
+
 Gebruik deze cijfers als uitgangspunt, maar wees specifiek en concreet met de data van de gebruiker (zie hieronder) — geen vage algemene tips, reken door met hun eigen cijfers.
 `.trim();

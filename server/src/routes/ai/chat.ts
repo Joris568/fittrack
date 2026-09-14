@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma } from "../../db.js";
 import type { AuthedRequest } from "../../auth/middleware.js";
 import { buildUserContext } from "./contextBuilder.js";
-import { callClaude } from "./claudeClient.js";
+import { callClaude, callClaudeWithTools } from "./claudeClient.js";
+import { buildCoachTools } from "./coachTools.js";
 import { TRAINING_KNOWLEDGE_BASE } from "./knowledgeBase.js";
 
 export const chatRouter = Router();
@@ -17,6 +18,8 @@ Je bent geen passieve assistent die alleen antwoord geeft als erom gevraagd word
 Val nooit terug op standaard-schema's zoals "3-4 sets van 8-12 reps" als vast antwoord — dat is verouderde bro-science, geen evidence-based advies (zie kennisbasis hieronder). Baseer elk concreet getal (sets, reps, gewicht, kcal) op de daadwerkelijke data van deze gebruiker en zijn/haar specifieke doel; als je te weinig data hebt om iets concreets te zeggen, zeg dat expliciet en vraag door in plaats van een generiek getal te verzinnen.
 Geef concrete, onderbouwde adviezen op basis van de data hieronder. Wees direct en praktisch, geen wollige taal.
 Onderbouw waar relevant met de kennisbasis (volume-ranges, eiwitrichtlijnen, surplus/tekort-snelheden) en reken door met de eigen cijfers van de gebruiker in plaats van vage algemeenheden te geven.
+
+Je kunt ook echt dingen aanpassen in de app via de beschikbare acties (tools) — niet alleen erover praten. Als de gebruiker vraagt om een schema te maken, een oefening toe te voegen/aan te passen/te verwijderen, of een voedingsdoel in te stellen: doe dit direct via de bijbehorende actie, vraag niet eerst om bevestiging tenzij iets destructiefs is (zoals een heel programma vervangen). Gebruik altijd eerst list_programs om de exacte huidige namen te weten voordat je een bestaand programma wijzigt. Meld daarna kort en concreet wat je hebt gedaan (geen technische details, gewoon in mensentaal: "Ik heb Schouderdrukken toegevoegd aan je Push-dag met 3x10-15").
 Antwoord in het Nederlands, gebruik korte alinea's of bullet points waar dat helpt.
 
 ${TRAINING_KNOWLEDGE_BASE}
@@ -87,17 +90,18 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
   await prisma.chatMessage.create({ data: { userId, role: "user", content: parsed.data.message } });
 
   try {
-    const reply = await callClaude({
+    const { finalText, actionsTaken } = await callClaudeWithTools({
       system: COACH_SYSTEM_PROMPT + context,
       messages: [
         ...orderedHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         { role: "user", content: parsed.data.message },
       ],
+      tools: buildCoachTools(userId),
       maxTokens: 1024,
     });
 
-    await prisma.chatMessage.create({ data: { userId, role: "assistant", content: reply } });
-    res.json({ reply });
+    await prisma.chatMessage.create({ data: { userId, role: "assistant", content: finalText } });
+    res.json({ reply: finalText, actionsTaken });
   } catch (err) {
     console.error("Chat AI call failed", err);
     res.status(502).json({ error: (err as Error).message });
