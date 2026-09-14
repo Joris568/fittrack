@@ -28,6 +28,35 @@ export async function callClaude(params: {
   return textBlock && textBlock.type === "text" ? textBlock.text : "";
 }
 
+/** Sends one image (as a data URL, e.g. from ProgressPhoto.imageData) to Claude for
+ * visual analysis alongside a text prompt. Used for physique-photo analysis — kept as
+ * a separate one-off call rather than threading images through the main chat history,
+ * so ordinary text turns stay cheap and simple. */
+export async function analyzeImage(params: { imageDataUrl: string; prompt: string; maxTokens?: number }): Promise<string> {
+  const match = params.imageDataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) throw new Error("Ongeldige afbeelding: verwacht een base64 data-URL.");
+  const [, mediaType, base64Data] = match;
+
+  const response = await getClient().messages.create({
+    model: env.anthropicModel,
+    max_tokens: params.maxTokens ?? 1024,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64Data },
+          },
+          { type: "text", text: params.prompt },
+        ],
+      },
+    ],
+  });
+  const textBlock = response.content.find((b) => b.type === "text");
+  return textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+}
+
 /** Calls Claude with a tool definition that forces a single structured JSON reply. */
 export async function callClaudeJson<T>(params: {
   system: string;
