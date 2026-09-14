@@ -185,16 +185,21 @@ export default function SettingsPage() {
         {weightChartData.length > 1 && (
           <ResponsiveContainer width="100%" height={160} className="mt-3">
             <LineChart data={weightChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-              <XAxis dataKey="date" fontSize={10} />
-              <YAxis fontSize={10} width={35} domain={["dataMin - 1", "dataMax + 1"]} />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="#232937" />
+              <XAxis dataKey="date" fontSize={10} tick={{ fill: "#8890A3" }} />
+              <YAxis
+                fontSize={10}
+                width={35}
+                domain={["dataMin - 1", "dataMax + 1"]}
+                tick={{ fill: "#8890A3" }}
+              />
+              <Tooltip contentStyle={{ background: "#151A22", border: "1px solid #2A3140", color: "#F4F5F9" }} />
               <Line
                 type="monotone"
                 dataKey="weight"
-                stroke="#16b862"
+                stroke="#3FDE84"
                 strokeWidth={2}
-                dot={{ r: 2 }}
+                dot={{ r: 2, fill: "#3FDE84" }}
                 isAnimationActive={false}
               />
             </LineChart>

@@ -9,8 +9,9 @@ body,
 }
 
 body {
-  background-color: #f7f8fa;
-  color: #111827;
+  background-color: #0a0d12;
+  color: #f4f5f9;
+  font-family: "Manrope", system-ui, -apple-system, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -18,4 +19,11 @@ input,
 select,
 textarea {
   font-size: 16px; /* prevent iOS zoom on focus */
+}
+
+/* Native date/select pickers stay usable in a dark theme without a full custom
+   control — this just makes the browser render their built-in chrome in dark mode. */
+input[type="date"],
+select {
+  color-scheme: dark;
 }

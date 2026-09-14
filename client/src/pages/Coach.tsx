@@ -3,16 +3,56 @@ import { api } from "../api/client.js";
 import { ChatMessage } from "../api/types.js";
 import { Button, Input, PageTitle, Spinner } from "../components/ui.js";
 
+const POLL_INTERVAL_MS = 2000;
+const POLL_TIMEOUT_MS = 120_000;
+
 export default function Coach() {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function stopPolling() {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    pollTimer.current = null;
+    setSending(false);
+  }
+
+  // Polls the (server-persisted) history until a fresh assistant reply shows up —
+  // works even if this component unmounted and remounted in between, since the
+  // coach keeps working server-side regardless of whether anyone's looking.
+  function pollUntilReplied() {
+    setSending(true);
+    const startedAt = Date.now();
+    pollTimer.current = setInterval(async () => {
+      if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+        stopPolling();
+        return;
+      }
+      try {
+        const history = await api.get<ChatMessage[]>("/ai/chat");
+        const last = history[history.length - 1];
+        if (last && last.role === "assistant") {
+          setMessages(history);
+          stopPolling();
+        }
+      } catch {
+        // Transient network hiccup — keep polling, the interval will retry.
+      }
+    }, POLL_INTERVAL_MS);
+  }
 
   useEffect(() => {
     (async () => {
       const history = await api.get<ChatMessage[]>("/ai/chat");
       setMessages(history);
+      const last = history[history.length - 1];
+      if (last && last.role === "user") {
+        // A reply was still pending from before (e.g. we navigated away mid-answer).
+        pollUntilReplied();
+        return;
+      }
       try {
         const checkin = await api.post<ChatMessage | null>("/ai/chat/checkin");
         if (checkin) setMessages((prev) => [...(prev ?? []), checkin]);
@@ -20,6 +60,7 @@ export default function Coach() {
         // Proactive check-in is a nice-to-have — silently skip if it fails.
       }
     })();
+    return () => stopPolling();
   }, []);
 
   useEffect(() => {
@@ -35,26 +76,13 @@ export default function Coach() {
       ...(prev ?? []),
       { id: `tmp-${Date.now()}`, role: "user", content: message, createdAt: new Date().toISOString() },
     ]);
-    setSending(true);
     try {
-      const res = await api.post<{ reply: string }>("/ai/chat", { message });
-      setMessages((prev) => [
-        ...(prev ?? []),
-        { id: `tmp-r-${Date.now()}`, role: "assistant", content: res.reply, createdAt: new Date().toISOString() },
-      ]);
-    } catch (err) {
-      setMessages((prev) => [
-        ...(prev ?? []),
-        {
-          id: `tmp-e-${Date.now()}`,
-          role: "assistant",
-          content: "Er ging iets mis, probeer het nog eens.",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    } finally {
-      setSending(false);
+      await api.post("/ai/chat", { message });
+    } catch {
+      // Even if the initial request fails to confirm, the message may still have saved —
+      // polling will pick up a reply if the server actually processed it.
     }
+    pollUntilReplied();
   }
 
   if (!messages) return <Spinner />;
@@ -72,7 +100,7 @@ export default function Coach() {
           <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-line ${
-                m.role === "user" ? "bg-brand-600 text-white" : "bg-white shadow-sm text-gray-800"
+                m.role === "user" ? "bg-brand-500 text-bg font-medium" : "bg-surface shadow-sm text-gray-800"
               }`}
             >
               {m.content}
@@ -81,7 +109,9 @@ export default function Coach() {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-white shadow-sm rounded-2xl px-3.5 py-2.5 text-sm text-gray-400">Aan het typen...</div>
+            <div className="bg-surface shadow-sm rounded-2xl px-3.5 py-2.5 text-sm text-gray-400">
+              Aan het denken... (dit blijft doorgaan ook als je even wegnavigeert)
+            </div>
           </div>
         )}
         <div ref={bottomRef} />

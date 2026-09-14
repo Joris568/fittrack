@@ -48,16 +48,16 @@ function ProgressChart() {
       {selected && chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-            <XAxis dataKey="date" fontSize={11} />
-            <YAxis fontSize={11} width={30} />
-            <Tooltip />
+            <CartesianGrid strokeDasharray="3 3" stroke="#232937" />
+            <XAxis dataKey="date" fontSize={11} tick={{ fill: "#8890A3" }} />
+            <YAxis fontSize={11} width={30} tick={{ fill: "#8890A3" }} />
+            <Tooltip contentStyle={{ background: "#151A22", border: "1px solid #2A3140", color: "#F4F5F9" }} />
             <Line
               type="monotone"
               dataKey="weight"
-              stroke="#16b862"
+              stroke="#3FDE84"
               strokeWidth={2}
-              dot={{ r: 3 }}
+              dot={{ r: 3, fill: "#3FDE84" }}
               isAnimationActive={false}
             />
           </LineChart>

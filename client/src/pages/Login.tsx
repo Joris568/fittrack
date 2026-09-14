@@ -26,7 +26,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center px-6 bg-bg">
       <Card className="w-full max-w-sm">
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">💪</div>

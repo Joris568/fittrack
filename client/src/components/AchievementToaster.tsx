@@ -19,12 +19,12 @@ export default function AchievementToaster() {
   return (
     <div
       key={current.key}
-      className="fixed top-4 left-1/2 -translate-x-1/2 z-30 bg-gray-900 text-white rounded-2xl px-4 py-3 shadow-lg flex items-center gap-3 max-w-[90%]"
+      className="fixed top-4 left-1/2 -translate-x-1/2 z-30 bg-brand-500 text-bg rounded-2xl px-4 py-3 shadow-glow flex items-center gap-3 max-w-[90%]"
     >
       <span className="text-2xl">🏆</span>
       <div>
         <p className="font-semibold text-sm leading-tight">Badge ontgrendeld: {current.title}</p>
-        <p className="text-xs text-gray-300">{current.description}</p>
+        <p className="text-xs opacity-80">{current.description}</p>
       </div>
     </div>
   );

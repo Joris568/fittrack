@@ -89,8 +89,14 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
 
   await prisma.chatMessage.create({ data: { userId, role: "user", content: parsed.data.message } });
 
+  // Respond immediately and keep working after — a multi-turn tool-use reply can take a
+  // while, and tying it to the open HTTP request means it dies the moment a mobile browser
+  // backgrounds the tab or the user navigates away. The client polls GET /ai/chat instead,
+  // so the reply lands (and any program/goal changes get made) even if nobody's watching.
+  res.status(202).json({ pending: true });
+
   try {
-    const { finalText, actionsTaken } = await callClaudeWithTools({
+    const { finalText } = await callClaudeWithTools({
       system: COACH_SYSTEM_PROMPT + context,
       messages: [
         ...orderedHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
@@ -99,11 +105,15 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
       tools: buildCoachTools(userId),
       maxTokens: 1024,
     });
-
     await prisma.chatMessage.create({ data: { userId, role: "assistant", content: finalText } });
-    res.json({ reply: finalText, actionsTaken });
   } catch (err) {
     console.error("Chat AI call failed", err);
-    res.status(502).json({ error: (err as Error).message });
+    await prisma.chatMessage.create({
+      data: {
+        userId,
+        role: "assistant",
+        content: "Er ging iets mis bij het verwerken van je bericht. Probeer het nog eens.",
+      },
+    });
   }
 });

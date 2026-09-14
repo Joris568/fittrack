@@ -1,7 +1,7 @@
 import React from "react";
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`bg-white rounded-2xl shadow-sm p-4 ${className}`}>{children}</div>;
+  return <div className={`bg-surface rounded-2xl shadow-card p-4 ${className}`}>{children}</div>;
 }
 
 export function Button({
@@ -11,14 +11,14 @@ export function Button({
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
   const styles = {
-    primary: "bg-brand-600 text-white active:bg-brand-700 disabled:opacity-50",
+    primary: "bg-brand-500 text-bg font-semibold shadow-glow active:bg-brand-700 disabled:opacity-40 disabled:shadow-none",
     secondary: "bg-gray-100 text-gray-800 active:bg-gray-200",
     danger: "bg-red-50 text-red-600 active:bg-red-100",
-    ghost: "bg-transparent text-brand-600",
+    ghost: "bg-transparent text-brand-400 active:text-brand-300",
   }[variant];
   return (
     <button
-      className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-colors ${styles} ${className}`}
+      className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all active:scale-[0.97] ${styles} ${className}`}
       {...rest}
     >
       {children}
@@ -30,7 +30,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full px-3 py-2.5 rounded-xl border border-gray-200 focus:border-brand-500 focus:outline-none ${props.className ?? ""}`}
+      className={`w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-bg-raised text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none ${props.className ?? ""}`}
     />
   );
 }
