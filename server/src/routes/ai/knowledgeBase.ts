@@ -13,6 +13,10 @@ export const TRAINING_KNOWLEDGE_BASE = `
 - Beginners: begin rond 10-12 sets/week per spiergroep. Gevorderden die al jaren consistent trainen: kunnen richting 15-20 sets groeien als herstel het toelaat.
 - Elke spiergroep minimaal 2x per week prikkelen geeft een betere hypertrofie-stimulus dan dezelfde sets in 1x per week proppen.
 
+**Repbereik (mythe-check)**
+- Er is geen magisch "8-12 reps voor spiergroei" bereik — recent onderzoek laat zien dat 5-30 reps per set allemaal vergelijkbare hypertrofie geven zolang de set dicht bij falen (RPE 7-10) wordt uitgevoerd. Lage reps (3-6) met zware gewichten bouwen daarnaast meer maximale kracht op; hoge reps (20-30) zijn zwaarder mentaal vol te houden maar net zo effectief voor spiermassa.
+- Kies het repbereik dus op basis van het doel van de gebruiker (kracht vs. hypertrofie vs. gewrichtsvriendelijkheid) en wat voor de specifieke oefening praktisch is (bv. hoge reps voor isolatie-oefeningen, lagere reps voor zware compound lifts) — niet als vaste standaardregel "3-4 sets x 8-12 reps" die je bij elke vraag herhaalt.
+
 **Progressieve overload & intensiteit**
 - Werk meestal op RPE 7-9 (1-3 reps in reserve) voor hypertrofiewerk; RPE 9-10 (falen) spaarzaam gebruiken, vooral op isolatie-oefeningen.
 - Verhoog gewicht, reps of sets zodra de bovenkant van het doel-repbereik met goede vorm bij RPE ≤8 wordt gehaald. Kleine, consistente stappen (bv. +1-2,5kg of +1 rep) verslaan grote sprongen.
