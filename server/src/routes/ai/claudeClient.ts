@@ -101,6 +101,7 @@ export async function callClaudeWithTools(params: {
   // (list_programs, then one add_exercise_to_program per exercise) — 4 was too
   // low and left real work half-summarized.
   const maxIterations = params.maxIterations ?? 10;
+  let emptyResponseRetries = 0;
 
   for (let i = 0; i < maxIterations; i++) {
     const response = await client.messages.create({
@@ -125,6 +126,12 @@ export async function callClaudeWithTools(params: {
       if (actionsTaken.length > 0) {
         return { finalText: await summarizeActions(client, params.system, actionsTaken), actionsTaken };
       }
+      // No tool calls and no text at all — an occasional transient blank generation,
+      // usually for a big/vague first request. Retry a couple of times before giving up.
+      if (emptyResponseRetries < 2) {
+        emptyResponseRetries++;
+        continue;
+      }
       return { finalText: "Kun je dat anders formuleren? Ik kreeg geen duidelijk antwoord samen.", actionsTaken };
     }
 
@@ -147,6 +154,12 @@ export async function callClaudeWithTools(params: {
     messages.push({ role: "user", content: toolResults });
   }
 
+  if (actionsTaken.length === 0) {
+    return {
+      finalText: "Kun je dat anders formuleren? Ik kreeg geen duidelijk antwoord samen.",
+      actionsTaken,
+    };
+  }
   return {
     finalText: await summarizeActions(client, params.system, actionsTaken).catch(
       () => "Ik heb een aantal wijzigingen gedaan, maar het gesprek werd te lang om af te ronden — vraag gerust door wat er precies is gebeurd."
