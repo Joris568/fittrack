@@ -4,7 +4,7 @@ import { ChatMessage } from "../api/types.js";
 import { Button, Input, PageTitle, Spinner } from "../components/ui.js";
 
 const POLL_INTERVAL_MS = 2000;
-const POLL_TIMEOUT_MS = 120_000;
+const POLL_TIMEOUT_MS = 180_000; // building a full program can chain many tool calls
 
 export default function Coach() {
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);

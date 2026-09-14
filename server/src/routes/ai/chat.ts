@@ -103,7 +103,8 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
         { role: "user", content: parsed.data.message },
       ],
       tools: buildCoachTools(userId),
-      maxTokens: 1024,
+      maxTokens: 1536,
+      maxIterations: 10,
     });
     await prisma.chatMessage.create({ data: { userId, role: "assistant", content: finalText } });
   } catch (err) {

@@ -97,12 +97,15 @@ export async function callClaudeWithTools(params: {
     content: m.content,
   }));
   const actionsTaken: string[] = [];
-  const maxIterations = params.maxIterations ?? 4;
+  // Building a whole multi-day program can genuinely take several tool calls
+  // (list_programs, then one add_exercise_to_program per exercise) — 4 was too
+  // low and left real work half-summarized.
+  const maxIterations = params.maxIterations ?? 10;
 
   for (let i = 0; i < maxIterations; i++) {
     const response = await client.messages.create({
       model: env.anthropicModel,
-      max_tokens: params.maxTokens ?? 1024,
+      max_tokens: params.maxTokens ?? 1536,
       system: params.system,
       messages,
       tools: anthropicTools,
@@ -114,7 +117,15 @@ export async function callClaudeWithTools(params: {
 
     if (toolUses.length === 0) {
       const textBlock = response.content.find((b) => b.type === "text");
-      return { finalText: textBlock && textBlock.type === "text" ? textBlock.text : "", actionsTaken };
+      const text = textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+      if (text) return { finalText: text, actionsTaken };
+      // Claude sometimes ends a tool-use turn without any closing text at all.
+      // Rather than show an empty bubble, force one more plain-text turn asking
+      // it to summarize what it just did.
+      if (actionsTaken.length > 0) {
+        return { finalText: await summarizeActions(client, params.system, actionsTaken), actionsTaken };
+      }
+      return { finalText: "Kun je dat anders formuleren? Ik kreeg geen duidelijk antwoord samen.", actionsTaken };
     }
 
     messages.push({ role: "assistant", content: response.content });
@@ -137,7 +148,31 @@ export async function callClaudeWithTools(params: {
   }
 
   return {
-    finalText: "Ik heb een aantal wijzigingen gedaan, maar het gesprek werd te lang om af te ronden — vraag gerust door.",
+    finalText: await summarizeActions(client, params.system, actionsTaken).catch(
+      () => "Ik heb een aantal wijzigingen gedaan, maar het gesprek werd te lang om af te ronden — vraag gerust door wat er precies is gebeurd."
+    ),
     actionsTaken,
   };
+}
+
+/** Forces a short plain-text (no tools) summary of what was just done, for the
+ * case where Claude finishes a string of tool calls without ever writing a
+ * closing message on its own. */
+async function summarizeActions(client: Anthropic, system: string, actionsTaken: string[]): Promise<string> {
+  const response = await client.messages.create({
+    model: env.anthropicModel,
+    max_tokens: 300,
+    system,
+    messages: [
+      {
+        role: "user",
+        content: `Je hebt zojuist deze acties uitgevoerd: ${actionsTaken.join(
+          "; "
+        )}. Vat in 1-2 korte zinnen in het Nederlands samen wat je hebt gedaan, in mensentaal (geen technische namen of JSON). Geen tools gebruiken, alleen platte tekst.`,
+      },
+    ],
+  });
+  const textBlock = response.content.find((b) => b.type === "text");
+  const text = textBlock && textBlock.type === "text" ? textBlock.text.trim() : "";
+  return text || "Klaar! Ik heb de gevraagde wijzigingen doorgevoerd.";
 }
