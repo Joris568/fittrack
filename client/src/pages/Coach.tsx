@@ -185,7 +185,6 @@ export default function Coach() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           className="hidden"
           onChange={handlePhotoSelected}
         />
