@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
-import { ChatMessage } from "../api/types.js";
+import { ChatMessage, ProgressPhoto } from "../api/types.js";
 import { Button, Input, PageTitle, Spinner } from "../components/ui.js";
+import { resizeImageToDataUrl } from "../lib/image.js";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 180_000; // building a full program can chain many tool calls
 
+/** Extends the persisted chat message with a client-only image preview, used for the
+ * optimistic bubble shown right after a photo upload — the photo itself is persisted
+ * as a ProgressPhoto, not as part of the chat message content. */
+type DisplayMessage = ChatMessage & { imagePreview?: string };
+
 export default function Coach() {
-  const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  const [messages, setMessages] = useState<DisplayMessage[] | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function stopPolling() {
     if (pollTimer.current) clearInterval(pollTimer.current);
@@ -67,22 +75,62 @@ export default function Coach() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    const message = input.trim();
-    if (!message || sending) return;
-    setInput("");
+  async function sendMessage(text: string) {
     setMessages((prev) => [
       ...(prev ?? []),
-      { id: `tmp-${Date.now()}`, role: "user", content: message, createdAt: new Date().toISOString() },
+      { id: `tmp-${Date.now()}`, role: "user", content: text, createdAt: new Date().toISOString() },
     ]);
     try {
-      await api.post("/ai/chat", { message });
+      await api.post("/ai/chat", { message: text });
     } catch {
       // Even if the initial request fails to confirm, the message may still have saved —
       // polling will pick up a reply if the server actually processed it.
     }
     pollUntilReplied();
+  }
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    const message = input.trim();
+    if (!message || sending) return;
+    setInput("");
+    await sendMessage(message);
+  }
+
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || sending) return;
+    setPhotoError(null);
+    const caption = input.trim();
+    setInput("");
+    try {
+      const dataUrl = await resizeImageToDataUrl(file);
+      setMessages((prev) => [
+        ...(prev ?? []),
+        {
+          id: `tmp-${Date.now()}`,
+          role: "user",
+          content: caption || "📷 Nieuwe voortgangsfoto",
+          createdAt: new Date().toISOString(),
+          imagePreview: dataUrl,
+        },
+      ]);
+      setSending(true);
+      await api.post<ProgressPhoto>("/progress-photos", { imageData: dataUrl });
+      const message = caption
+        ? `${caption} (ik heb er net een nieuwe voortgangsfoto bij geüpload — kijk ernaar)`
+        : "Ik heb net een nieuwe voortgangsfoto geüpload — kijk ernaar en geef gericht advies voor mijn bouw.";
+      try {
+        await api.post("/ai/chat", { message });
+      } catch {
+        // Same fire-and-forget contract as the text path — polling picks up the reply.
+      }
+      pollUntilReplied();
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : "Foto uploaden mislukt");
+      setSending(false);
+    }
   }
 
   if (!messages) return <Spinner />;
@@ -103,6 +151,9 @@ export default function Coach() {
                 m.role === "user" ? "bg-brand-500 text-bg font-medium" : "bg-surface shadow-sm text-gray-800"
               }`}
             >
+              {m.imagePreview && (
+                <img src={m.imagePreview} alt="Voortgangsfoto" className="rounded-xl mb-2 max-h-48 object-cover" />
+              )}
               {m.content}
             </div>
           </div>
@@ -116,7 +167,25 @@ export default function Coach() {
         )}
         <div ref={bottomRef} />
       </div>
+      {photoError && <p className="text-red-500 text-xs pb-1">{photoError}</p>}
       <form onSubmit={send} className="flex gap-2 pt-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={handlePhotoSelected}
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={sending}
+          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-surface text-gray-400 text-lg disabled:opacity-40"
+          aria-label="Foto toevoegen"
+        >
+          📷
+        </button>
         <Input
           placeholder="Vraag iets aan je coach..."
           value={input}
