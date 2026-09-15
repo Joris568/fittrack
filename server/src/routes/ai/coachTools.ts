@@ -1,7 +1,7 @@
 import { prisma } from "../../db.js";
 import { makeExerciseResolver } from "../../lib/exerciseResolver.js";
 import { checkAndUnlockAchievements } from "../../gamification/achievements.js";
-import { analyzeImage, type AgentTool } from "./claudeClient.js";
+import { analyzeImages, type AgentTool } from "./claudeClient.js";
 
 interface ExerciseInput {
   exerciseName: string;
@@ -194,26 +194,34 @@ export function buildCoachTools(userId: string): AgentTool[] {
     {
       name: "analyze_physique_photo",
       description:
-        "Analyseer de meest recente voortgangsfoto van de gebruiker (indien geüpload bij Instellingen) op lichaamsbouw: schouderbreedte t.o.v. taille, torso-verhoudingen, welke spiergroepen relatief onder-/overontwikkeld ogen, en wat specifiek voor DEZE bouw de meeste 'brede V-taper'-impact zou geven. Gebruik dit als de gebruiker vraagt naar zijn/haar bouw, physique, hoe hij/zij eruitziet, of om een op het lichaam afgestemd (in plaats van generiek) trainings-/voedingsadvies. Combineer de uitkomst daarna met update_program_exercise / add_exercise_to_program / set_nutrition_goal om het advies ook echt door te voeren.",
+        "Analyseer de meest recente voortgangsfoto's van de gebruiker (indien geüpload, bv. bij Instellingen of in de chat — tot 3 tegelijk als er kort na elkaar meerdere zijn geüpload, bv. verschillende hoeken) op lichaamsbouw: schouderbreedte t.o.v. taille, torso-verhoudingen, welke spiergroepen relatief onder-/overontwikkeld ogen, en wat specifiek voor DEZE bouw de meeste 'brede V-taper'-impact zou geven. Gebruik dit als de gebruiker vraagt naar zijn/haar bouw, physique, hoe hij/zij eruitziet, of om een op het lichaam afgestemd (in plaats van generiek) trainings-/voedingsadvies. Combineer de uitkomst daarna met update_program_exercise / add_exercise_to_program / set_nutrition_goal om het advies ook echt door te voeren.",
       inputSchema: { type: "object", properties: {} },
       execute: async () => {
-        const photo = await prisma.progressPhoto.findFirst({
+        const recent = await prisma.progressPhoto.findMany({
           where: { userId },
           orderBy: { date: "desc" },
+          take: 5,
         });
-        if (!photo) {
-          return { error: "Geen voortgangsfoto gevonden. Vraag de gebruiker er eentje te uploaden bij Instellingen." };
+        if (recent.length === 0) {
+          return { error: "Geen voortgangsfoto gevonden. Vraag de gebruiker er eentje te uploaden (bv. via de camera-knop in de chat, of bij Instellingen)." };
         }
-        const analysis = await analyzeImage({
-          imageDataUrl: photo.imageData,
-          prompt: `Analyseer deze fysieke voortgangsfoto van een krachtsporter als een ervaren coach. Beschrijf kort en concreet:
+        // Only group photos uploaded within a few minutes of the newest one as "the same
+        // batch" (e.g. front/side/back shots from one session) — otherwise an old photo
+        // from weeks ago could get mixed into the analysis alongside a brand new one.
+        const BATCH_WINDOW_MS = 10 * 60 * 1000;
+        const newestTime = recent[0].date.getTime();
+        const photos = recent.filter((p) => newestTime - p.date.getTime() <= BATCH_WINDOW_MS).slice(0, 3);
+        const multiple = photos.length > 1;
+        const analysis = await analyzeImages({
+          imageDataUrls: photos.map((p) => p.imageData),
+          prompt: `Analyseer de${multiple ? "ze fysieke voortgangsfoto's (mogelijk verschillende hoeken van dezelfde persoon)" : " fysieke voortgangsfoto"} van een krachtsporter als een ervaren coach. Beschrijf kort en concreet:
 1. Verhouding schouderbreedte t.o.v. taille/heupen (de basis van een V-taper).
 2. Torso-lengte en algemene lichaamsbouw (bv. lange armen/torso beïnvloedt hoe oefeningen aanvoelen en welke spiergroepen visueel het meeste bijdragen aan breedte).
-3. Welke spiergroepen relatief onder- of overontwikkeld ogen ten opzichte van de rest.
+3. Welke spiergroepen relatief onder- of overontwikkeld ogen ten opzichte van de rest${multiple ? " (gebruik de verschillende hoeken om dit vollediger te beoordelen dan vanaf één kant mogelijk is)" : ""}.
 4. Concrete conclusie: wat zou voor DEZE specifieke bouw de meeste visuele 'brede'-impact geven (bv. meer focus op laterale delts, lat-breedte, of juist taille/vetpercentage) — wees specifiek, geen generiek lijstje.
 Antwoord in het Nederlands, direct en feitelijk, max 6 zinnen. Dit is voor trainingsadvies, geen medisch of lichaamsbeeld-oordeel.`,
         });
-        return { analysis, photoDate: photo.date };
+        return { analysis, photosAnalyzed: photos.length, mostRecentDate: photos[0].date };
       },
     },
     {

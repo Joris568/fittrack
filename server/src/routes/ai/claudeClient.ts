@@ -28,14 +28,22 @@ export async function callClaude(params: {
   return textBlock && textBlock.type === "text" ? textBlock.text : "";
 }
 
-/** Sends one image (as a data URL, e.g. from ProgressPhoto.imageData) to Claude for
- * visual analysis alongside a text prompt. Used for physique-photo analysis — kept as
- * a separate one-off call rather than threading images through the main chat history,
- * so ordinary text turns stay cheap and simple. */
-export async function analyzeImage(params: { imageDataUrl: string; prompt: string; maxTokens?: number }): Promise<string> {
-  const match = params.imageDataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-  if (!match) throw new Error("Ongeldige afbeelding: verwacht een base64 data-URL.");
-  const [, mediaType, base64Data] = match;
+/** Sends one or more images (as data URLs, e.g. from ProgressPhoto.imageData) to Claude
+ * for visual analysis alongside a text prompt. Used for physique-photo analysis — kept
+ * as a separate one-off call rather than threading images through the main chat
+ * history, so ordinary text turns stay cheap and simple. Multiple images (e.g. front/
+ * side/back shots uploaded together) let Claude reason about the physique as a whole
+ * instead of guessing from a single angle. */
+export async function analyzeImages(params: { imageDataUrls: string[]; prompt: string; maxTokens?: number }): Promise<string> {
+  const imageBlocks: Anthropic.ImageBlockParam[] = params.imageDataUrls.map((url) => {
+    const match = url.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!match) throw new Error("Ongeldige afbeelding: verwacht een base64 data-URL.");
+    const [, mediaType, base64Data] = match;
+    return {
+      type: "image",
+      source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64Data },
+    };
+  });
 
   const response = await getClient().messages.create({
     model: env.anthropicModel,
@@ -43,13 +51,7 @@ export async function analyzeImage(params: { imageDataUrl: string; prompt: strin
     messages: [
       {
         role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64Data },
-          },
-          { type: "text", text: params.prompt },
-        ],
+        content: [...imageBlocks, { type: "text", text: params.prompt }],
       },
     ],
   });

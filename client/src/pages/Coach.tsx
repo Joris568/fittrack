@@ -97,28 +97,35 @@ export default function Coach() {
     await sendMessage(message);
   }
 
-  async function uploadPhoto(file: File) {
-    if (sending) return;
+  async function uploadPhotos(files: File[]) {
+    if (sending || files.length === 0) return;
     setPhotoError(null);
     const caption = input.trim();
     setInput("");
     try {
-      const dataUrl = await resizeImageToDataUrl(file);
+      const dataUrls = await Promise.all(files.map((f) => resizeImageToDataUrl(f)));
       setMessages((prev) => [
         ...(prev ?? []),
-        {
-          id: `tmp-${Date.now()}`,
-          role: "user",
-          content: caption || "📷 Nieuwe voortgangsfoto",
+        ...dataUrls.map((dataUrl, i) => ({
+          id: `tmp-${Date.now()}-${i}`,
+          role: "user" as const,
+          content: i === 0 ? caption || (dataUrls.length > 1 ? `📷 ${dataUrls.length} nieuwe voortgangsfoto's` : "📷 Nieuwe voortgangsfoto") : "",
           createdAt: new Date().toISOString(),
           imagePreview: dataUrl,
-        },
+        })),
       ]);
       setSending(true);
-      await api.post<ProgressPhoto>("/progress-photos", { imageData: dataUrl });
-      const message = caption
-        ? `${caption} (ik heb er net een nieuwe voortgangsfoto bij geüpload — kijk ernaar)`
-        : "Ik heb net een nieuwe voortgangsfoto geüpload — kijk ernaar en geef gericht advies voor mijn bouw.";
+      // Sequential, not Promise.all: keeps ProgressPhoto.date strictly increasing per
+      // upload order, which is what analyze_physique_photo relies on to pick the latest.
+      for (const dataUrl of dataUrls) {
+        await api.post<ProgressPhoto>("/progress-photos", { imageData: dataUrl });
+      }
+      const message =
+        dataUrls.length > 1
+          ? `${caption ? caption + " " : ""}Ik heb net ${dataUrls.length} nieuwe voortgangsfoto's geüpload (verschillende hoeken) — kijk ernaar en geef gericht advies voor mijn bouw.`
+          : caption
+            ? `${caption} (ik heb er net een nieuwe voortgangsfoto bij geüpload — kijk ernaar)`
+            : "Ik heb net een nieuwe voortgangsfoto geüpload — kijk ernaar en geef gericht advies voor mijn bouw.";
       try {
         await api.post("/ai/chat", { message });
       } catch {
@@ -126,23 +133,25 @@ export default function Coach() {
       }
       pollUntilReplied();
     } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : "Foto uploaden mislukt");
+      setPhotoError(err instanceof Error ? err.message : "Foto's uploaden mislukt");
       setSending(false);
     }
   }
 
   function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (file) uploadPhoto(file);
+    if (files.length) uploadPhotos(files);
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
-    const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"));
-    if (!item) return; // no image on the clipboard — let normal text paste happen
+    const files = Array.from(e.clipboardData.items)
+      .filter((i) => i.type.startsWith("image/"))
+      .map((i) => i.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (files.length === 0) return; // no image on the clipboard — let normal text paste happen
     e.preventDefault();
-    const file = item.getAsFile();
-    if (file) uploadPhoto(file);
+    uploadPhotos(files);
   }
 
   if (!messages) return <Spinner />;
@@ -185,6 +194,7 @@ export default function Coach() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={handlePhotoSelected}
         />
