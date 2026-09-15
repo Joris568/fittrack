@@ -97,10 +97,8 @@ export default function Coach() {
     await sendMessage(message);
   }
 
-  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || sending) return;
+  async function uploadPhoto(file: File) {
+    if (sending) return;
     setPhotoError(null);
     const caption = input.trim();
     setInput("");
@@ -131,6 +129,20 @@ export default function Coach() {
       setPhotoError(err instanceof Error ? err.message : "Foto uploaden mislukt");
       setSending(false);
     }
+  }
+
+  function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (file) uploadPhoto(file);
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"));
+    if (!item) return; // no image on the clipboard — let normal text paste happen
+    e.preventDefault();
+    const file = item.getAsFile();
+    if (file) uploadPhoto(file);
   }
 
   if (!messages) return <Spinner />;
@@ -190,6 +202,7 @@ export default function Coach() {
           placeholder="Vraag iets aan je coach..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onPaste={handlePaste}
           disabled={sending}
         />
         <Button type="submit" disabled={sending || !input.trim()}>
