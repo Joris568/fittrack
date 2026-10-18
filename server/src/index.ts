@@ -23,12 +23,16 @@ import { recipeParserRouter } from "./routes/ai/recipeParser.js";
 import { goalProposalRouter } from "./routes/ai/goalProposal.js";
 import { programParserRouter } from "./routes/ai/programParser.js";
 import { progressPhotosRouter } from "./routes/progressPhotos.js";
+import { exportRouter } from "./routes/export.js";
+import { recoverStuckChats } from "./routes/ai/chat.js";
+import { startMaintenance } from "./maintenance.js";
 import { calendarRouter } from "./routes/calendar.js";
 import { dashboardRouter } from "./routes/dashboard.js";
 import { mealPhotoRouter } from "./routes/ai/mealPhoto.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+app.set("trust proxy", 1); // behind Render's proxy, so req.ip is the real client (login rate limit)
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "5mb" })); // progress-photo uploads are base64 data URLs
@@ -44,6 +48,7 @@ app.use("/api/food", requireAuth, foodRouter);
 app.use("/api/goals", requireAuth, goalsRouter);
 app.use("/api/body-metrics", requireAuth, bodyMetricsRouter);
 app.use("/api/progress-photos", requireAuth, progressPhotosRouter);
+app.use("/api/export", requireAuth, exportRouter);
 app.use("/api/calendar", requireAuth, calendarRouter);
 app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/gamification", requireAuth, gamificationRouter);
@@ -79,4 +84,6 @@ process.on("unhandledRejection", (reason) => {
 
 app.listen(env.port, () => {
   console.log(`FitTrack server draait op http://localhost:${env.port}`);
+  recoverStuckChats().catch((e) => console.error("Chat recovery failed", e));
+  startMaintenance();
 });

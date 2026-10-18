@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { env } from "../env.js";
 import { getOrCreateSingleUser } from "../db.js";
 import type { AuthedRequest } from "./middleware.js";
+import { clearLoginFailures, loginBlockedForMs, recordLoginFailure } from "./rateLimit.js";
 
 export const authRouter = Router();
 
@@ -15,10 +16,17 @@ function safeEqual(a: string, b: string) {
 }
 
 authRouter.post("/login", async (req, res) => {
+  const ip = req.ip ?? "unknown";
+  const blockedMs = loginBlockedForMs(ip);
+  if (blockedMs > 0) {
+    return res.status(429).json({ error: `Te veel pogingen. Probeer het over ${Math.ceil(blockedMs / 60_000)} minuten opnieuw.` });
+  }
   const { passphrase } = req.body ?? {};
   if (typeof passphrase !== "string" || !safeEqual(passphrase, env.appPassword)) {
+    recordLoginFailure(ip);
     return res.status(401).json({ error: "Onjuist wachtwoord" });
   }
+  clearLoginFailures(ip);
   const user = await getOrCreateSingleUser(env.userEmail);
   const token = jwt.sign({ userId: user.id }, env.jwtSecret, { expiresIn: "180d" });
   res.cookie("session", token, {

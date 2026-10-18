@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
 import { checkAndUnlockAchievements } from "../gamification/achievements.js";
+import { isPersonalRecord } from "../lib/strength.js";
 
 export const workoutsRouter = Router();
 
@@ -104,11 +105,13 @@ workoutsRouter.post("/:id/sets", async (req: AuthedRequest, res) => {
   });
   if (!session) return res.status(404).json({ error: "Not found" });
 
-  const previousBest = await prisma.setLog.aggregate({
+  // A record = a higher estimated 1RM than any earlier set (so more reps at the same
+  // weight counts too, not only a heavier weight).
+  const previousSets = await prisma.setLog.findMany({
     where: { exerciseId: parsed.data.exerciseId, workoutSession: { userId: req.userId } },
-    _max: { weight: true },
+    select: { weight: true, reps: true },
   });
-  const isPR = previousBest._max.weight != null && parsed.data.weight > previousBest._max.weight;
+  const isPR = isPersonalRecord(previousSets, parsed.data);
 
   const setLog = await prisma.setLog.create({
     data: { workoutSessionId: session.id, ...parsed.data, isPR },

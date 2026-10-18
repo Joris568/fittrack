@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
 import { checkAndUnlockAchievements } from "../gamification/achievements.js";
+import { addDaysKey, dayKeyOf, dayRange, toDayKey } from "../lib/tz.js";
 
 export const foodRouter = Router();
 
@@ -197,15 +198,11 @@ foodRouter.post("/log", async (req: AuthedRequest, res) => {
 });
 
 foodRouter.get("/log", async (req: AuthedRequest, res) => {
-  const dateParam = typeof req.query.date === "string" ? req.query.date : undefined;
-  const day = dateParam ? new Date(dateParam) : new Date();
-  const start = new Date(day);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(day);
-  end.setHours(23, 59, 59, 999);
+  const key = toDayKey(req.query.date, req.tz) ?? dayKeyOf(new Date(), req.tz);
+  const { start, end } = dayRange(key, req.tz);
 
   const entries = await prisma.foodLogEntry.findMany({
-    where: { userId: req.userId, date: { gte: start, lte: end } },
+    where: { userId: req.userId, date: { gte: start, lt: end } },
     include: { foodItem: true },
     orderBy: { date: "asc" },
   });
@@ -224,14 +221,10 @@ foodRouter.post("/log/copy", async (req: AuthedRequest, res) => {
   const parsed = copySchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  const from = new Date(parsed.data.fromDate);
-  const start = new Date(from);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(from);
-  end.setHours(23, 59, 59, 999);
+  const { start, end } = dayRange(dayKeyOf(new Date(parsed.data.fromDate), req.tz), req.tz);
 
   const sourceEntries = await prisma.foodLogEntry.findMany({
-    where: { userId: req.userId, mealType: parsed.data.mealType, date: { gte: start, lte: end } },
+    where: { userId: req.userId, mealType: parsed.data.mealType, date: { gte: start, lt: end } },
   });
   if (sourceEntries.length === 0) {
     return res.status(404).json({ error: "Geen items gevonden om te kopiëren." });
@@ -258,10 +251,9 @@ foodRouter.post("/log/copy", async (req: AuthedRequest, res) => {
 });
 
 foodRouter.get("/log/summary", async (req: AuthedRequest, res) => {
-  const days = req.query.days ? Number(req.query.days) : 14;
-  const start = new Date();
-  start.setDate(start.getDate() - (days - 1));
-  start.setHours(0, 0, 0, 0);
+  const days = Math.max(1, Math.min(90, req.query.days ? Number(req.query.days) : 14));
+  const todayKey = dayKeyOf(new Date(), req.tz);
+  const { start } = dayRange(addDaysKey(todayKey, -(days - 1)), req.tz);
 
   const entries = await prisma.foodLogEntry.findMany({
     where: { userId: req.userId, date: { gte: start } },
@@ -270,7 +262,7 @@ foodRouter.get("/log/summary", async (req: AuthedRequest, res) => {
 
   const byDay = new Map<string, { cal: number; protein: number; carbs: number; fat: number }>();
   for (const entry of entries) {
-    const key = entry.date.toISOString().slice(0, 10);
+    const key = dayKeyOf(entry.date, req.tz);
     const factor = entry.quantityGrams / 100;
     const totals = byDay.get(key) ?? { cal: 0, protein: 0, carbs: 0, fat: 0 };
     totals.cal += entry.foodItem.caloriesPer100g * factor;
@@ -282,11 +274,8 @@ foodRouter.get("/log/summary", async (req: AuthedRequest, res) => {
 
   const result = [];
   for (let i = days - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
-    const totals = byDay.get(key) ?? { cal: 0, protein: 0, carbs: 0, fat: 0 };
-    result.push({ date: key, ...totals });
+    const key = addDaysKey(todayKey, -i);
+    result.push({ date: key, ...(byDay.get(key) ?? { cal: 0, protein: 0, carbs: 0, fat: 0 }) });
   }
   res.json(result);
 });

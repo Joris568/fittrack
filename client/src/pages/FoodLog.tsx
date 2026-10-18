@@ -27,7 +27,7 @@ const MEAL_TYPES: { key: FoodLogEntry["mealType"]; label: string }[] = [
 ];
 
 function toDateKey(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return d.toLocaleDateString("en-CA"); // local calendar day, not the UTC one
 }
 
 function formatDayLabel(d: Date): string {

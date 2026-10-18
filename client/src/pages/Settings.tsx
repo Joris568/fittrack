@@ -19,6 +19,7 @@ export default function SettingsPage() {
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [storage, setStorage] = useState<{ photoCount: number; photoBytes: number; chatImageBytes: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function load() {
@@ -29,6 +30,7 @@ export default function SettingsPage() {
     load();
     api.get<GamificationSummary>("/gamification/summary").then(setGamification);
     api.get<ProgressPhoto[]>("/progress-photos").then(setPhotos);
+    api.get<{ photoCount: number; photoBytes: number; chatImageBytes: number }>("/export/storage").then(setStorage).catch(() => {});
   }, []);
 
   async function addMetric(e: React.FormEvent) {
@@ -50,15 +52,17 @@ export default function SettingsPage() {
   }
 
   async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
     setUploadingPhoto(true);
     setPhotoError(null);
     try {
-      const dataUrl = await resizeImageToDataUrl(file);
-      const photo = await api.post<ProgressPhoto>("/progress-photos", { imageData: dataUrl });
-      setPhotos((prev) => [photo, ...prev]);
+      for (const file of files) {
+        const dataUrl = await resizeImageToDataUrl(file);
+        const photo = await api.post<ProgressPhoto>("/progress-photos", { imageData: dataUrl });
+        setPhotos((prev) => [photo, ...prev]);
+      }
     } catch (err) {
       setPhotoError(err instanceof Error ? err.message : "Uploaden mislukt");
     } finally {
@@ -237,7 +241,7 @@ export default function SettingsPage() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
-            capture="environment"
+            multiple
             className="hidden"
             onChange={handlePhotoSelected}
           />
@@ -263,6 +267,28 @@ export default function SettingsPage() {
             ))}
           </div>
         )}
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold mb-1">Back-up &amp; opslag</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Download al je data als bestand, zodat je nooit afhankelijk bent van één database.
+          {storage && (
+            <>
+              {" "}
+              Foto&apos;s nemen {(storage.photoBytes / 1_048_576).toFixed(1)} MB in ({storage.photoCount} stuks), chat-bijlagen{" "}
+              {(storage.chatImageBytes / 1_048_576).toFixed(1)} MB (worden na 7 dagen opgeruimd).
+            </>
+          )}
+        </p>
+        <div className="flex gap-2">
+          <a href="/api/export" className="flex-1 text-center px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-100 border border-gray-200 text-gray-800">
+            Back-up (zonder foto&apos;s)
+          </a>
+          <a href="/api/export?photos=1" className="flex-1 text-center px-4 py-2.5 rounded-lg text-sm font-medium bg-gray-100 border border-gray-200 text-gray-800">
+            Met foto&apos;s
+          </a>
+        </div>
       </Card>
 
       <Button variant="danger" className="w-full" onClick={handleLogout}>

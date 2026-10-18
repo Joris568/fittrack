@@ -1,4 +1,5 @@
 import { prisma } from "../db.js";
+import { addDaysKey, dayKeyOf, weekStartKey } from "../lib/tz.js";
 
 export interface AchievementDef {
   key: string;
@@ -32,34 +33,23 @@ const CATALOG: (AchievementDef & { check: (s: Stats) => boolean })[] = [
   { key: "nutrition_month", title: "Op de radar", description: "30 dagen voeding gelogd", check: (s) => s.totalFoodLogDays >= 30 },
 ];
 
-export function startOfWeek(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = (d.getDay() + 6) % 7; // Monday = 0
-  d.setDate(d.getDate() - day);
-  return d;
-}
-
-/** Consecutive weeks (Mon-Sun) with >=1 workout, walking back from the current week. An
- * in-progress current week with no session yet doesn't break the streak. */
-export function computeWeeklyStreak(sessionDates: Date[]): number {
-  const weekStarts = new Set(sessionDates.map((d) => startOfWeek(d).getTime()));
-  let cursor = startOfWeek(new Date());
-  if (!weekStarts.has(cursor.getTime())) {
-    cursor = new Date(cursor);
-    cursor.setDate(cursor.getDate() - 7);
-  }
+/** Consecutive weeks (Mon-Sun, in the user's timezone) with >=1 workout, walking back from
+ * the current week. An in-progress current week with no session yet doesn't break the streak. */
+export function computeWeeklyStreak(sessionDates: Date[], tz = 0, now = new Date()): number {
+  const weeks = new Set(sessionDates.map((d) => weekStartKey(dayKeyOf(d, tz))));
+  let cursor = weekStartKey(dayKeyOf(now, tz));
+  if (!weeks.has(cursor)) cursor = addDaysKey(cursor, -7);
   let streak = 0;
-  while (weekStarts.has(cursor.getTime())) {
+  while (weeks.has(cursor)) {
     streak++;
-    cursor = new Date(cursor);
-    cursor.setDate(cursor.getDate() - 7);
+    cursor = addDaysKey(cursor, -7);
   }
   return streak;
 }
 
 async function computeStats(userId: string): Promise<Stats> {
-  const [totalWorkouts, totalPRs, totalPrograms, sessions, foodEntries] = await Promise.all([
+  const [user, totalWorkouts, totalPRs, totalPrograms, sessions, foodEntries] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { tzOffsetMin: true } }),
     prisma.workoutSession.count({ where: { userId } }),
     prisma.setLog.count({ where: { isPR: true, workoutSession: { userId } } }),
     prisma.workoutProgram.count({ where: { userId } }),
@@ -67,13 +57,14 @@ async function computeStats(userId: string): Promise<Stats> {
     prisma.foodLogEntry.findMany({ where: { userId }, select: { date: true } }),
   ]);
 
-  const distinctFoodDays = new Set(foodEntries.map((f) => f.date.toDateString())).size;
+  const tz = user?.tzOffsetMin ?? 0;
+  const distinctFoodDays = new Set(foodEntries.map((f) => dayKeyOf(f.date, tz))).size;
 
   return {
     totalWorkouts,
     totalPRs,
     totalPrograms,
-    streakWeeks: computeWeeklyStreak(sessions.map((s) => s.date)),
+    streakWeeks: computeWeeklyStreak(sessions.map((s) => s.date), tz),
     totalFoodLogDays: distinctFoodDays,
   };
 }

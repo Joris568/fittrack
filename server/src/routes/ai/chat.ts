@@ -146,23 +146,55 @@ function imageNote(images: string | null, kind: string | null): string {
     : ` [${n} screenshot(s) meegestuurd, nu niet meer zichtbaar]`;
 }
 
+/** Replies that mean "the coach didn't answer" — these can be retried instead of re-typed. */
+export const isErrorReply = (content: string) => content.startsWith("Er ging iets mis") || content.startsWith("Sorry, mijn antwoord");
+
+type TriggerMessage = { content: string; images: string[]; kind?: "screenshot" | "progress" };
+
+/** Runs the coach for one user message and stores the reply (or a readable error). The HTTP
+ * request has long since returned by now, so this must never throw. */
+async function generateReply(userId: string, trigger: TriggerMessage, history: { role: string; content: string; images: string | null; imageKind: string | null }[]) {
+  try {
+    const context = await buildUserContext(userId);
+    const { finalText } = await callClaudeWithTools({
+      system: todayLine() + COACH_SYSTEM_PROMPT + context,
+      messages: [
+        ...history
+          .filter((m) => m.content.trim().length > 0) // legacy empty replies make the API reject the call
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.content + imageNote(m.images, m.imageKind),
+          })),
+        {
+          role: "user" as const,
+          content:
+            trigger.kind === "screenshot"
+              ? `${trigger.content}\n\n[De gebruiker stuurt ${trigger.images.length} screenshot(s)/afbeelding(en) mee — geen voortgangsfoto's. Bekijk en bespreek wat erop staat.]`
+              : trigger.kind === "progress"
+                ? `${trigger.content}\n\n[De gebruiker heeft ${trigger.images.length} voortgangsfoto('s) van zijn lichaam geüpload en opgeslagen — beoordeel die met analyze_physique_photo.]`
+                : trigger.content,
+          images: trigger.kind === "screenshot" ? trigger.images : undefined,
+        },
+      ],
+      tools: buildCoachTools(userId),
+      maxTokens: 2048,
+      maxIterations: 10,
+    });
+    await prisma.chatMessage.create({ data: { userId, role: "assistant", content: finalText } });
+  } catch (err) {
+    console.error("Chat AI call failed", err);
+    await prisma.chatMessage
+      .create({ data: { userId, role: "assistant", content: describeChatError(err) } })
+      .catch((e) => console.error("Could not store chat error reply", e));
+  }
+}
+
 chatRouter.post("/", async (req: AuthedRequest, res) => {
   const parsed = chatSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const userId = req.userId!;
-  const [context, history] = await Promise.all([
-    buildUserContext(userId),
-    prisma.chatMessage.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
-  ]);
-
-  // Old replies saved before the empty-reply fix have content "" — the API rejects empty
-  // messages, so leave them out of what's sent to Claude.
-  const orderedHistory = history.reverse().filter((m) => m.content.trim().length > 0);
+  const history = (await prisma.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 20 })).reverse();
 
   const images = parsed.data.images ?? [];
   const kind = images.length ? (parsed.data.imageKind ?? "screenshot") : undefined;
@@ -188,35 +220,43 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
   // backgrounds the tab or the user navigates away. The client polls GET /ai/chat instead,
   // so the reply lands (and any program/goal changes get made) even if nobody's watching.
   res.status(202).json({ pending: true });
-
-  try {
-    const { finalText } = await callClaudeWithTools({
-      system: todayLine() + COACH_SYSTEM_PROMPT + context,
-      messages: [
-        ...orderedHistory.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content + imageNote(m.images, m.imageKind),
-        })),
-        {
-          role: "user" as const,
-          content:
-            kind === "screenshot"
-              ? `${parsed.data.message}\n\n[De gebruiker stuurt ${images.length} screenshot(s)/afbeelding(en) mee — geen voortgangsfoto's. Bekijk en bespreek wat erop staat.]`
-              : kind === "progress"
-                ? `${parsed.data.message}\n\n[De gebruiker heeft ${images.length} voortgangsfoto('s) van zijn lichaam geüpload en opgeslagen — beoordeel die met analyze_physique_photo.]`
-                : parsed.data.message,
-          images: kind === "screenshot" ? images : undefined,
-        },
-      ],
-      tools: buildCoachTools(userId),
-      maxTokens: 2048,
-      maxIterations: 10,
-    });
-    await prisma.chatMessage.create({ data: { userId, role: "assistant", content: finalText } });
-  } catch (err) {
-    console.error("Chat AI call failed", err);
-    await prisma.chatMessage.create({
-      data: { userId, role: "assistant", content: describeChatError(err) },
-    });
-  }
+  await generateReply(userId, { content: parsed.data.message, images, kind }, history);
 });
+
+/** Re-runs the coach for the last user message after a failed or lost reply (an error
+ * reply, or a restart that dropped the answer), without the user having to retype it. */
+chatRouter.post("/retry", async (req: AuthedRequest, res) => {
+  const userId = req.userId!;
+  const recent = await prisma.chatMessage.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 22 });
+  const errorIds: string[] = [];
+  let i = 0;
+  while (i < recent.length && recent[i].role === "assistant" && isErrorReply(recent[i].content)) errorIds.push(recent[i++].id);
+  const last = recent[i];
+  if (!last || last.role !== "user") return res.status(400).json({ error: "Er is niets om opnieuw te proberen." });
+
+  if (errorIds.length) await prisma.chatMessage.deleteMany({ where: { id: { in: errorIds } } });
+  const history = recent.slice(i + 1, i + 21).reverse();
+  const images = (() => {
+    try {
+      const v = JSON.parse(last.images ?? "[]");
+      return Array.isArray(v) ? (v as string[]) : [];
+    } catch {
+      return [];
+    }
+  })();
+  res.status(202).json({ pending: true });
+  await generateReply(userId, { content: last.content, images, kind: images.length ? ((last.imageKind as "screenshot" | "progress" | null) ?? "screenshot") : undefined }, history);
+});
+
+/** At startup nothing can be mid-reply, so a conversation whose last message is the user's
+ * was cut off by a restart/deploy — leave a retryable note instead of a forever-spinner. */
+export async function recoverStuckChats() {
+  const latest = await prisma.chatMessage.findMany({ orderBy: { createdAt: "desc" }, distinct: ["userId"], take: 20 });
+  for (const m of latest) {
+    if (m.role === "user") {
+      await prisma.chatMessage.create({
+        data: { userId: m.userId, role: "assistant", content: "Sorry, mijn antwoord ging verloren doordat de server herstartte. Tik op 'Opnieuw proberen'." },
+      });
+    }
+  }
+}

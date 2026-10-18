@@ -8,6 +8,8 @@ const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 180_000; // building a full program can chain many tool calls
 const MAX_IMAGES = 4;
 
+const isErrorReply = (content: string) => content.startsWith("Er ging iets mis") || content.startsWith("Sorry, mijn antwoord");
+
 const KIND_LABEL: Record<ChatImageKind, string> = { screenshot: "Screenshot", progress: "Voortgangsfoto" };
 
 export default function Coach() {
@@ -107,6 +109,17 @@ export default function Coach() {
     addFiles(files);
   }
 
+  async function retry() {
+    setPhotoError(null);
+    try {
+      await api.post("/ai/chat/retry");
+      setMessages(await api.get<ChatMessage[]>("/ai/chat"));
+      pollUntilReplied();
+    } catch {
+      setPhotoError("Opnieuw proberen lukt nu niet. Check je verbinding.");
+    }
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     if (sending) return;
@@ -186,6 +199,13 @@ export default function Coach() {
             <div className="bg-surface border border-gray-100 shadow-sm rounded-2xl px-3.5 py-2.5 text-sm text-gray-400">
               Aan het denken... (dit blijft doorgaan ook als je even wegnavigeert)
             </div>
+          </div>
+        )}
+        {!sending && messages.length > 0 && (messages[messages.length - 1].role === "user" || isErrorReply(messages[messages.length - 1].content)) && (
+          <div className="flex justify-start">
+            <Button variant="secondary" className="!py-1.5 text-xs" onClick={retry}>
+              Opnieuw proberen
+            </Button>
           </div>
         )}
         <div ref={bottomRef} />

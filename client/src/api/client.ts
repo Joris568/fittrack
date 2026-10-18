@@ -14,6 +14,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      // Lets the server group days (meals, workouts) the way the user sees them.
+      "X-TZ-Offset": String(new Date().getTimezoneOffset()),
       ...options.headers,
     },
   });
