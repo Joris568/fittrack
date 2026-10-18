@@ -231,6 +231,8 @@ model ChatMessage {
   user      User     @relation(fields: [userId], references: [id])
   role      String   // user | assistant
   content   String
+  images    String?  // JSON array of base64 data URLs attached to this message
+  imageKind String?  // "screenshot" (shown to the coach in-chat) | "progress" (also saved as progress photos)
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])

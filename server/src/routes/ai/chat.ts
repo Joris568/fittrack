@@ -26,6 +26,7 @@ Onderbouw waar relevant met de kennisbasis (volume-ranges, eiwitrichtlijnen, sur
 
 Je kunt ook echt dingen aanpassen in de app via de beschikbare acties (tools) — niet alleen erover praten. Als de gebruiker vraagt om een schema te maken, een oefening toe te voegen/aan te passen/te verwijderen, of een voedingsdoel in te stellen: doe dit direct via de bijbehorende actie, vraag niet eerst om bevestiging tenzij iets destructiefs is (zoals een heel programma vervangen). Gebruik altijd eerst list_programs om de exacte huidige namen te weten voordat je een bestaand programma wijzigt.
 Schrijf een schema NOOIT eerst volledig uit in platte tekst voordat je het bouwt — dat kost onnodig veel tokens en kan halverwege afgekapt worden. Roep bij een verzoek om een (volledig/meerdaags) schema meteen create_program aan met alle dagen en oefeningen in één keer; gebruik add_exercise_to_program alleen voor losse toevoegingen aan een bestaand programma. Meld pas ná het uitvoeren van de tools kort en concreet wat je hebt gedaan (geen technische details, gewoon in mensentaal: "Ik heb Schouderdrukken toegevoegd aan je Push-dag met 3x10-15").
+Er zijn twee soorten afbeeldingen. (1) Screenshots/overige afbeeldingen (een trainingslog of schema uit een andere app, een voedingsetiket, een tabel, een grafiek): die zie je direct in het gesprek, bespreek je inhoudelijk en geven feedback op, en zijn GEEN voortgangsfoto's — gebruik daar analyze_physique_photo niet voor en bewaar ze niet als voortgangsfoto. (2) Voortgangsfoto's van het lichaam: die worden opgeslagen en beoordeel je met analyze_physique_photo. Het bericht vermeldt welk soort het is. Zie je op een als screenshot gestuurde afbeelding toch een lichaamsfoto, zeg dat dan en vraag of het als voortgangsfoto bewaard moet worden.
 Je KUNT voortgangsfoto's wel degelijk beoordelen: via analyze_physique_photo zie je de foto's van de gebruiker echt. Zeg dus NOOIT dat je foto's niet kunt bekijken of beoordelen. Noemt de gebruiker foto's, of zegt hij er net een of meer geüpload te hebben, roep dan altijd eerst analyze_physique_photo aan en baseer je antwoord op wat daaruit komt. Geeft de tool een foutmelding dat er geen foto is, vraag dan om een foto via het camera-knopje.
 Verwijderen: vraagt de gebruiker uitdrukkelijk om iets te verwijderen (een programma, trainingsdag, gelogde training, eten, meting, foto of geplande training), doe dat dan direct met de verwijder-acties — zoek eerst het juiste id op met de bijbehorende list_-actie. Vraag alleen door als onduidelijk is welk item bedoeld wordt, of als het om "alles" gaat (bv. al het eten of alle programma's). Zeg erbij wat je precies hebt verwijderd; dat kan niet ongedaan gemaakt worden.
 Agenda: je kunt trainingen plannen in de agenda van de gebruiker (plan_workouts, list_planned_workouts, delete_planned_workouts). Plan bij een verzoek als "plan mijn week" meteen alle sessies in op echte datums, gebaseerd op de dagen van zijn programma en de datum van vandaag, en meld welke dag wanneer staat.
@@ -44,13 +45,33 @@ ${TRAINING_KNOWLEDGE_BASE}
 DATA VAN DE GEBRUIKER:
 `;
 
+const parseImages = (raw: string | null): string[] => {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+
+// Only the newest messages carry their image data back to the client — base64 images in
+// a 100-message history would make every poll heavy. Older ones keep just a count.
+const IMAGE_PAYLOAD_MESSAGES = 12;
+
 chatRouter.get("/", async (req: AuthedRequest, res) => {
   const messages = await prisma.chatMessage.findMany({
     where: { userId: req.userId },
     orderBy: { createdAt: "asc" },
     take: 100,
   });
-  res.json(messages);
+  res.json(
+    messages.map(({ images, ...m }, i) => {
+      const list = parseImages(images);
+      const recent = i >= messages.length - IMAGE_PAYLOAD_MESSAGES;
+      return { ...m, imageCount: list.length, images: recent ? list : [] };
+    })
+  );
 });
 
 /** Lazily generates a proactive opening message once per day, so the coach starts
@@ -106,7 +127,24 @@ function todayLine(): string {
   return `Vandaag is het ${weekday} ${amsterdamDayKey(now)} (Nederlandse tijd). Gebruik dit voor datums als "morgen" of "volgende week maandag".\n\n`;
 }
 
-const chatSchema = z.object({ message: z.string().min(1) });
+const chatSchema = z.object({
+  message: z.string().min(1),
+  images: z
+    .array(z.string().startsWith("data:image/").max(3_000_000))
+    .max(4)
+    .optional(),
+  imageKind: z.enum(["screenshot", "progress"]).optional(),
+});
+
+/** One-line note appended to older messages so the coach knows an image was part of them,
+ * without resending the image data every turn. */
+function imageNote(images: string | null, kind: string | null): string {
+  const n = parseImages(images).length;
+  if (!n) return "";
+  return kind === "progress"
+    ? ` [${n} voortgangsfoto('s) geüpload en opgeslagen]`
+    : ` [${n} screenshot(s) meegestuurd, nu niet meer zichtbaar]`;
+}
 
 chatRouter.post("/", async (req: AuthedRequest, res) => {
   const parsed = chatSchema.safeParse(req.body);
@@ -126,7 +164,24 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
   // messages, so leave them out of what's sent to Claude.
   const orderedHistory = history.reverse().filter((m) => m.content.trim().length > 0);
 
-  await prisma.chatMessage.create({ data: { userId, role: "user", content: parsed.data.message } });
+  const images = parsed.data.images ?? [];
+  const kind = images.length ? (parsed.data.imageKind ?? "screenshot") : undefined;
+  if (kind === "progress") {
+    // Only these go into the progress-photo gallery; screenshots are conversation
+    // material for the coach and must not end up in the body-photo collection.
+    for (const imageData of images) {
+      await prisma.progressPhoto.create({ data: { userId, imageData } });
+    }
+  }
+  await prisma.chatMessage.create({
+    data: {
+      userId,
+      role: "user",
+      content: parsed.data.message,
+      images: images.length ? JSON.stringify(images) : null,
+      imageKind: kind ?? null,
+    },
+  });
 
   // Respond immediately and keep working after — a multi-turn tool-use reply can take a
   // while, and tying it to the open HTTP request means it dies the moment a mobile browser
@@ -138,8 +193,20 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
     const { finalText } = await callClaudeWithTools({
       system: todayLine() + COACH_SYSTEM_PROMPT + context,
       messages: [
-        ...orderedHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-        { role: "user", content: parsed.data.message },
+        ...orderedHistory.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content + imageNote(m.images, m.imageKind),
+        })),
+        {
+          role: "user" as const,
+          content:
+            kind === "screenshot"
+              ? `${parsed.data.message}\n\n[De gebruiker stuurt ${images.length} screenshot(s)/afbeelding(en) mee — geen voortgangsfoto's. Bekijk en bespreek wat erop staat.]`
+              : kind === "progress"
+                ? `${parsed.data.message}\n\n[De gebruiker heeft ${images.length} voortgangsfoto('s) van zijn lichaam geüpload en opgeslagen — beoordeel die met analyze_physique_photo.]`
+                : parsed.data.message,
+          images: kind === "screenshot" ? images : undefined,
+        },
       ],
       tools: buildCoachTools(userId),
       maxTokens: 2048,

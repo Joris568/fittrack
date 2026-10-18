@@ -182,11 +182,17 @@ export interface WeeklyReportContent {
   recommendations: string[];
 }
 
+export type ChatImageKind = "screenshot" | "progress";
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
+  /** Only the newest messages include their image data; older ones just a count. */
+  images?: string[];
+  imageCount?: number;
+  imageKind?: ChatImageKind | null;
 }
 
 export interface UnlockedAchievement {

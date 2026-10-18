@@ -125,7 +125,8 @@ export interface AgentTurnResult {
  * the coach chat actually create/edit programs instead of only describing them. */
 export async function callClaudeWithTools(params: {
   system: string;
-  messages: { role: "user" | "assistant"; content: string }[];
+  /** `images` (data URLs) are attached to that message as vision input. */
+  messages: { role: "user" | "assistant"; content: string; images?: string[] }[];
   tools: AgentTool[];
   maxTokens?: number;
   maxIterations?: number;
@@ -139,7 +140,7 @@ export async function callClaudeWithTools(params: {
 
   const messages: Anthropic.MessageParam[] = params.messages.map((m) => ({
     role: m.role,
-    content: m.content,
+    content: m.images?.length ? [...m.images.map(toImageBlock), { type: "text" as const, text: m.content }] : m.content,
   }));
   const actionsTaken: string[] = [];
   // Building a whole multi-day program can genuinely take several tool calls

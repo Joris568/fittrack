@@ -1,21 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../api/client.js";
-import { ChatMessage, ProgressPhoto } from "../api/types.js";
+import { ChatImageKind, ChatMessage } from "../api/types.js";
 import { Button, Input, PageTitle, Spinner } from "../components/ui.js";
 import { resizeImageToDataUrl } from "../lib/image.js";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 180_000; // building a full program can chain many tool calls
+const MAX_IMAGES = 4;
 
-/** Extends the persisted chat message with a client-only image preview, used for the
- * optimistic bubble shown right after a photo upload — the photo itself is persisted
- * as a ProgressPhoto, not as part of the chat message content. */
-type DisplayMessage = ChatMessage & { imagePreview?: string };
+const KIND_LABEL: Record<ChatImageKind, string> = { screenshot: "Screenshot", progress: "Voortgangsfoto" };
 
 export default function Coach() {
-  const [messages, setMessages] = useState<DisplayMessage[] | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[] | null>(null);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [pending, setPending] = useState<string[]>([]);
+  const [kind, setKind] = useState<ChatImageKind>("screenshot");
   const [photoError, setPhotoError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -75,73 +75,26 @@ export default function Coach() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  async function sendMessage(text: string) {
-    setMessages((prev) => [
-      ...(prev ?? []),
-      { id: `tmp-${Date.now()}`, role: "user", content: text, createdAt: new Date().toISOString() },
-    ]);
-    try {
-      await api.post("/ai/chat", { message: text });
-    } catch {
-      // Even if the initial request fails to confirm, the message may still have saved —
-      // polling will pick up a reply if the server actually processed it.
-    }
-    pollUntilReplied();
-  }
-
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    const message = input.trim();
-    if (!message || sending) return;
-    setInput("");
-    await sendMessage(message);
-  }
-
-  async function uploadPhotos(files: File[]) {
-    if (sending || files.length === 0) return;
+  async function addFiles(files: File[]) {
     setPhotoError(null);
-    const caption = input.trim();
-    setInput("");
+    const room = MAX_IMAGES - pending.length;
+    if (room <= 0) {
+      setPhotoError(`Maximaal ${MAX_IMAGES} afbeeldingen per bericht.`);
+      return;
+    }
     try {
-      const dataUrls = await Promise.all(files.map((f) => resizeImageToDataUrl(f)));
-      setMessages((prev) => [
-        ...(prev ?? []),
-        ...dataUrls.map((dataUrl, i) => ({
-          id: `tmp-${Date.now()}-${i}`,
-          role: "user" as const,
-          content: i === 0 ? caption || (dataUrls.length > 1 ? `${dataUrls.length} nieuwe voortgangsfoto's` : "Nieuwe voortgangsfoto") : "",
-          createdAt: new Date().toISOString(),
-          imagePreview: dataUrl,
-        })),
-      ]);
-      setSending(true);
-      // Sequential, not Promise.all: keeps ProgressPhoto.date strictly increasing per
-      // upload order, which is what analyze_physique_photo relies on to pick the latest.
-      for (const dataUrl of dataUrls) {
-        await api.post<ProgressPhoto>("/progress-photos", { imageData: dataUrl });
-      }
-      const message =
-        dataUrls.length > 1
-          ? `${caption ? caption + " " : ""}Ik heb net ${dataUrls.length} nieuwe voortgangsfoto's geüpload (verschillende hoeken) — kijk ernaar en geef gericht advies voor mijn bouw.`
-          : caption
-            ? `${caption} (ik heb er net een nieuwe voortgangsfoto bij geüpload — kijk ernaar)`
-            : "Ik heb net een nieuwe voortgangsfoto geüpload — kijk ernaar en geef gericht advies voor mijn bouw.";
-      try {
-        await api.post("/ai/chat", { message });
-      } catch {
-        // Same fire-and-forget contract as the text path — polling picks up the reply.
-      }
-      pollUntilReplied();
+      const urls = await Promise.all(files.slice(0, room).map((f) => resizeImageToDataUrl(f)));
+      setPending((prev) => [...prev, ...urls].slice(0, MAX_IMAGES));
+      if (files.length > room) setPhotoError(`Maximaal ${MAX_IMAGES} afbeeldingen per bericht.`);
     } catch (err) {
-      setPhotoError(err instanceof Error ? err.message : "Foto's uploaden mislukt");
-      setSending(false);
+      setPhotoError(err instanceof Error ? err.message : "Afbeelding laden mislukt");
     }
   }
 
-  function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (files.length) uploadPhotos(files);
+    if (files.length) addFiles(files);
   }
 
   function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
@@ -151,7 +104,45 @@ export default function Coach() {
       .filter((f): f is File => f !== null);
     if (files.length === 0) return; // no image on the clipboard — let normal text paste happen
     e.preventDefault();
-    uploadPhotos(files);
+    addFiles(files);
+  }
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    if (sending) return;
+    const typed = input.trim();
+    if (!typed && pending.length === 0) return;
+    const images = pending;
+    const imageKind = kind;
+    const message =
+      typed ||
+      (imageKind === "progress"
+        ? "Dit zijn mijn nieuwe voortgangsfoto's — kijk ernaar en geef gericht advies voor mijn bouw."
+        : "Kijk naar deze screenshot en geef feedback.");
+
+    setInput("");
+    setPending([]);
+    setPhotoError(null);
+    setMessages((prev) => [
+      ...(prev ?? []),
+      {
+        id: `tmp-${Date.now()}`,
+        role: "user",
+        content: message,
+        createdAt: new Date().toISOString(),
+        ...(images.length ? { images, imageCount: images.length, imageKind } : {}),
+      },
+    ]);
+    try {
+      await api.post("/ai/chat", { message, ...(images.length ? { images, imageKind } : {}) });
+    } catch (err) {
+      // Even if the request fails to confirm, the message may still have saved — polling
+      // will pick up a reply if the server actually processed it. Surface hard rejections.
+      if (err instanceof Error && /groot|large|413/i.test(err.message)) {
+        setPhotoError("Een afbeelding is te groot. Probeer een kleinere of minder afbeeldingen.");
+      }
+    }
+    pollUntilReplied();
   }
 
   if (!messages) return <Spinner />;
@@ -172,8 +163,19 @@ export default function Coach() {
                 m.role === "user" ? "bg-gray-900 text-white" : "bg-surface border border-gray-100 shadow-sm text-gray-800"
               }`}
             >
-              {m.imagePreview && (
-                <img src={m.imagePreview} alt="Voortgangsfoto" className="rounded-xl mb-2 max-h-48 object-cover" />
+              {m.imageKind && (m.imageCount ?? 0) > 0 && (
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1.5">{KIND_LABEL[m.imageKind]}</p>
+              )}
+              {m.images && m.images.length > 0 ? (
+                <div className={`grid gap-1 mb-2 ${m.images.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                  {m.images.map((src, i) => (
+                    <img key={i} src={src} alt={KIND_LABEL[m.imageKind ?? "screenshot"]} className="rounded-lg max-h-48 w-full object-cover" />
+                  ))}
+                </div>
+              ) : (
+                (m.imageCount ?? 0) > 0 && (
+                  <p className="text-xs text-gray-400 mb-1.5">{m.imageCount} afbeelding(en) meegestuurd</p>
+                )
               )}
               {m.content}
             </div>
@@ -181,43 +183,76 @@ export default function Coach() {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-surface shadow-sm rounded-2xl px-3.5 py-2.5 text-sm text-gray-400">
+            <div className="bg-surface border border-gray-100 shadow-sm rounded-2xl px-3.5 py-2.5 text-sm text-gray-400">
               Aan het denken... (dit blijft doorgaan ook als je even wegnavigeert)
             </div>
           </div>
         )}
         <div ref={bottomRef} />
       </div>
+
+      {pending.length > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-surface p-2.5 mb-2 space-y-2">
+          <div className="flex gap-2 overflow-x-auto pt-2 px-1">
+            {pending.map((src, i) => (
+              <div key={i} className="relative shrink-0">
+                <img src={src} alt="Bijlage" className="w-14 h-14 rounded-lg object-cover" />
+                <button
+                  type="button"
+                  onClick={() => setPending((prev) => prev.filter((_, j) => j !== i))}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-900 text-white text-[10px] leading-none"
+                  aria-label="Verwijder bijlage"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(["screenshot", "progress"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setKind(k)}
+                className={`rounded-lg py-2 text-xs font-semibold border ${
+                  kind === k ? "bg-gray-900 text-white border-gray-900" : "bg-bg-raised text-gray-600 border-gray-200"
+                }`}
+              >
+                {KIND_LABEL[k]}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-500">
+            {kind === "screenshot"
+              ? "De coach bekijkt dit in het gesprek (bv. een trainingslog of etiket). Het wordt niet bij je voortgangsfoto's bewaard."
+              : "Wordt bewaard bij je voortgangsfoto's en de coach beoordeelt je bouw."}
+          </p>
+        </div>
+      )}
       {photoError && <p className="text-red-500 text-xs pb-1">{photoError}</p>}
-      <form onSubmit={send} className="flex gap-2 pt-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={handlePhotoSelected}
-        />
+      <form onSubmit={send} className="flex gap-2 pt-1">
+        <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFilesSelected} />
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={sending}
-          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-lg bg-surface border border-gray-200 text-gray-600 text-lg disabled:opacity-40"
-          aria-label="Foto toevoegen"
+          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-lg bg-surface border border-gray-200 text-gray-600 disabled:opacity-40"
+          aria-label="Afbeelding toevoegen"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
-            <circle cx="12" cy="13" r="3.5" />
+            <rect x="4" y="5" width="16" height="14" rx="2" />
+            <circle cx="9" cy="10" r="1.5" />
+            <path d="m20 16-4.5-4.5L8 19" />
           </svg>
         </button>
         <Input
-          placeholder="Vraag iets aan je coach..."
+          placeholder={pending.length ? "Vraag erbij (optioneel)" : "Vraag iets aan je coach..."}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onPaste={handlePaste}
           disabled={sending}
         />
-        <Button type="submit" disabled={sending || !input.trim()}>
+        <Button type="submit" disabled={sending || (!input.trim() && pending.length === 0)}>
           Stuur
         </Button>
       </form>
