@@ -8,19 +8,20 @@
 export const TRAINING_KNOWLEDGE_BASE = `
 ## Kennisbasis (evidence-based, gebruik dit als denkkader — geen generieke praatjes)
 
-**Trainingsvolume (hypertrofie)**
-- 10-20 harde sets per spiergroep per week is de bewezen effectieve range; onder de 10 is suboptimaal voor gevorderde lifters, boven de ~20 nemen de meerwaarde en herstelcapaciteit af (dose-response is niet lineair, sterk afvlakkend na ~10-12 sets).
-- Beginners: begin rond 10-12 sets/week per spiergroep. Gevorderden die al jaren consistent trainen: kunnen richting 15-20 sets groeien als herstel het toelaat.
-- Elke spiergroep minimaal 2x per week prikkelen geeft een betere hypertrofie-stimulus dan dezelfde sets in 1x per week proppen.
-
-**Repbereik (mythe-check)**
-- Er is geen magisch "8-12 reps voor spiergroei" bereik — recent onderzoek laat zien dat 5-30 reps per set allemaal vergelijkbare hypertrofie geven zolang de set dicht bij falen (RPE 7-10) wordt uitgevoerd. Lage reps (3-6) met zware gewichten bouwen daarnaast meer maximale kracht op; hoge reps (20-30) zijn zwaarder mentaal vol te houden maar net zo effectief voor spiermassa.
-- Kies het repbereik dus op basis van het doel van de gebruiker (kracht vs. hypertrofie vs. gewrichtsvriendelijkheid) en wat voor de specifieke oefening praktisch is (bv. hoge reps voor isolatie-oefeningen, lagere reps voor zware compound lifts) — niet als vaste standaardregel "3-4 sets x 8-12 reps" die je bij elke vraag herhaalt.
+**Standaard-aanpak (huidige consensus): weinig sets, hoge inspanning, 8-10 reps**
+- Het uitgangspunt voor schema's is LOW VOLUME / HIGH EFFORT: per oefening 2 harde werksets (opwarmsets tellen niet mee) van ~8-10 reps, genomen tot 0-1 reps in reserve (RPE 9-10, vlak voor of op spierfalen). Een harde set dichtbij falen is de echte groeiprikkel; extra sets en eindeloze reps zijn "junk volume" als de inspanning laag is.
+- Repbereik per type oefening: zware compounds (squat, deadlift, bankdrukken, rows, overhead press) 6-10 reps; machines en kabel-isolatie 8-12; kuiten, laterale delts en onderarmen mogen 10-15. 15-20+ reps per set is NIET de standaard: het geeft veel vermoeidheid en pijn zonder voordeel, en 4x15-20 is verouderde bro-science. Gebruik dat alleen als er een concrete reden is (bv. gewrichtsklachten, bewust metabole finisher).
+- Volume: ruwweg 6-12 harde sets per spiergroep per week is voor de meeste mensen de efficiënte zone (bv. 2-3 oefeningen x 2 sets). De winst vlakt snel af; veel meer sets is vaak overbodig. Meer volume is een tool voor als de progressie stagneert ÉN herstel (slaap, eiwit, energie) op orde is — voeg dan stap voor stap 1 set toe, niet vooraf 4-5 sets per oefening.
+- Frequentie: elke spiergroep 2x per week (full body 3x, upper/lower 4x of push/pull/legs) is beter dan 1x; een grote weekbelasting verdeel je over meer sessies in plaats van langere sessies.
+- Efficiëntie: 4-6 oefeningen per sessie (~45-60 min) is genoeg bij echte inspanning; lange sessies met 8+ oefeningen en veel sets duiden meestal op te weinig intensiteit per set.
+- Rust: 2-3 min tussen sets van zware compounds, 1-2 min bij isolatie — bij kortere rust zakken je reps en daarmee de kwaliteit van de volgende set.
+- Wetenschappelijke nuance (blijf eerlijk): onderzoek toont dat een breed repbereik (ruwweg 5-30) kan werken zolang sets dicht bij falen zijn, en dat meer sets tot een punt meer groei geven met sterk afnemende meerwaarde. De huidige trend en praktijk is daarom: minimale effectieve dosis eerst (2 harde sets, 8-10 reps), meer alleen als het nodig is. Noem de reden erbij ("minder junk volume, zelfde prikkel, beter herstel") in plaats van alleen een getal.
 
 **Progressieve overload & intensiteit**
-- Werk meestal op RPE 7-9 (1-3 reps in reserve) voor hypertrofiewerk; RPE 9-10 (falen) spaarzaam gebruiken, vooral op isolatie-oefeningen.
-- Verhoog gewicht, reps of sets zodra de bovenkant van het doel-repbereik met goede vorm bij RPE ≤8 wordt gehaald. Kleine, consistente stappen (bv. +1-2,5kg of +1 rep) verslaan grote sprongen.
-- Deload elke 4-6 weken hard trainen (gevorderden/hoge intensiteit: elke 3-4 weken): halveer ongeveer het volume of verhoog RIR naar 5-6 voor één week.
+- Dubbele progressie: werk in een repbereik (bv. 8-10). Haal je bovenin (10 reps) met goede vorm op de laatste set, verhoog dan het gewicht (+2,5 kg of kleinste stap) en begin weer op ~8. Kleine, consistente stappen verslaan grote sprongen. Leg dit uit en gebruik het met de eigen logs van de gebruiker.
+- Toets inspanning: als iemand dezelfde gewichten en reps blijft doen met veel reps in reserve (te makkelijk), is dat het echte probleem — niet te weinig sets. Vraag hoe dichtbij falen de laatste set was.
+- Falen: op isolatie-oefeningen en machines (laag blessurerisico) gerust tot echt falen; op zware vrije compounds (squat, deadlift, bankdrukken) 1 rep in reserve voor veiligheid en techniek.
+- Deload elke 6-8 weken (of eerder bij aanhoudende vermoeidheid/stagnatie): ~halveer het aantal sets of verlaag gewicht ~10% voor een week.
 
 **Eiwit**
 - 1.6-2.2 g/kg lichaamsgewicht per dag voor spieropbouw; het effect plateaut rond ~1.6 g/kg, met individuele ruimte tot 2.2 g/kg. Meer dan dat heeft geen extra hypertrofie-voordeel.
@@ -77,7 +78,7 @@ export const TRAINING_KNOWLEDGE_BASE = `
 - De "brede" look komt hoofdzakelijk van laterale delts (breedte op schouderhoogte) en lat-breedte (rug), gecombineerd met een relatief smalle taille — prioriteer daarom lateral raises (zwaar puntje van de kennisbasis: hoog volume, vaak 3-4x/week te verdragen omdat het een klein, snel herstellend spiertje is) en brede-grip lat pulldown/optrekken voor breedte, naast de normale compounds.
 - Zichtbare buikspieren/V-taper-perceptie komt voor het overgrote deel van vetpercentage (ruwweg ~10-14% voor mannen voor zichtbare definitie), niet van extra buikspieroefeningen — bij een lean bulk dus de surplus en het tempo bewaken (zie hierboven), anders verdwijnt de "lean" in "lean bulk".
 - Realistisch tempo voor een intermediate (~1-2 jaar consistent trainen, wat dit profiel betreft): natuurlijke spieropbouw van ~0.25-0.5kg/maand is normaal en goed; alles wat sneller gaat is grotendeels vet/water, geen reden om te stressen maar wel om de surplusgrootte te checken.
-- Concreet 1.5 jaar → volgende niveau: consistente 10-20 sets/week voor schouders (vooral lateraal) en rug-breedte, eiwit en surplus scherp houden, en elke 8-12 weken evalueren of het tempo (kracht + gewicht + foto's) nog klopt met het doel — dat is het verschil tussen "gewoon jaren trainen" en gericht naar een specifieke look toewerken.
+- Concreet 1.5 jaar → volgende niveau: consistente harde sets (ruwweg 8-12/week, 2 per oefening, dicht bij falen) voor schouders (vooral lateraal) en rug-breedte, eiwit en surplus scherp houden, en elke 8-12 weken evalueren of het tempo (kracht + gewicht + foto's) nog klopt met het doel — dat is het verschil tussen "gewoon jaren trainen" en gericht naar een specifieke look toewerken.
 
 Gebruik deze cijfers als uitgangspunt, maar wees specifiek en concreet met de data van de gebruiker (zie hieronder) — geen vage algemene tips, reken door met hun eigen cijfers.
 `.trim();
