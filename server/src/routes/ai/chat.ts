@@ -75,6 +75,22 @@ chatRouter.post("/checkin", async (req: AuthedRequest, res) => {
   }
 });
 
+/** A short, readable reason for a failed coach reply, so a problem like an empty API
+ * balance or a rate limit is visible in the chat instead of a vague "something went wrong". */
+function describeChatError(err: unknown): string {
+  const e = err as { status?: number; message?: string };
+  const detail = (e.message ?? "").replace(/\s+/g, " ").slice(0, 160);
+  let reason = "onbekende fout";
+  if (e.status === 401 || e.status === 403) reason = "de Anthropic API-key werkt niet (meer)";
+  else if (e.status === 402 || /credit balance/i.test(detail)) reason = "het Anthropic-tegoed is op";
+  else if (e.status === 429) reason = "te veel verzoeken achter elkaar, even wachten";
+  else if (e.status === 404) reason = "het ingestelde AI-model bestaat niet";
+  else if (e.status === 413 || /too large|too long/i.test(detail)) reason = "het bericht of de foto is te groot";
+  else if (e.status === 529 || (e.status && e.status >= 500)) reason = "Claude is tijdelijk overbelast";
+  else if (e.status === 400) reason = "de aanvraag werd afgewezen";
+  return `Er ging iets mis bij het verwerken van je bericht (${reason}). Probeer het nog eens.${detail ? `\n\nTechnisch: ${detail}` : ""}`;
+}
+
 const chatSchema = z.object({ message: z.string().min(1) });
 
 chatRouter.post("/", async (req: AuthedRequest, res) => {
@@ -91,7 +107,9 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
     }),
   ]);
 
-  const orderedHistory = history.reverse();
+  // Old replies saved before the empty-reply fix have content "" — the API rejects empty
+  // messages, so leave them out of what's sent to Claude.
+  const orderedHistory = history.reverse().filter((m) => m.content.trim().length > 0);
 
   await prisma.chatMessage.create({ data: { userId, role: "user", content: parsed.data.message } });
 
@@ -116,11 +134,7 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
   } catch (err) {
     console.error("Chat AI call failed", err);
     await prisma.chatMessage.create({
-      data: {
-        userId,
-        role: "assistant",
-        content: "Er ging iets mis bij het verwerken van je bericht. Probeer het nog eens.",
-      },
+      data: { userId, role: "assistant", content: describeChatError(err) },
     });
   }
 });
