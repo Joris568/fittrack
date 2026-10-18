@@ -1,4 +1,5 @@
 import { prisma } from "../../db.js";
+import { buildProfileContext } from "../../lib/profileInsights.js";
 
 function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -32,7 +33,7 @@ export async function buildUserContext(userId: string): Promise<string> {
     }),
   ]);
 
-  const lines: string[] = [];
+  const lines: string[] = [await buildProfileContext(userId), ""];
 
   // Training summary: per exercise, chronological top-set trend.
   lines.push("## Trainingsgeschiedenis (laatste 6 weken)");

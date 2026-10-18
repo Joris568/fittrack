@@ -223,6 +223,13 @@ export default function Dashboard() {
     <div className="space-y-4">
       <PageTitle>Dashboard</PageTitle>
 
+      {data.profileMissing && (
+        <Link to="/profile" className="block rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+          <p className="font-semibold text-sm text-brand-700">Maak je profiel af (1 minuut)</p>
+          <p className="text-xs text-gray-600 mt-0.5">Dan klopt je onderhoud en kan de coach echt op jou afstemmen.</p>
+        </Link>
+      )}
+
       <WeekStrip data={data} onSelect={(d) => load(d)} />
 
       <LevelCard g={data.gamification} />

@@ -2,6 +2,8 @@ import { prisma } from "../../db.js";
 import { makeExerciseResolver } from "../../lib/exerciseResolver.js";
 import { checkAndUnlockAchievements } from "../../gamification/achievements.js";
 import { analyzeImages, type AgentTool } from "./claudeClient.js";
+import { parseNotes } from "../../lib/profileInsights.js";
+import { profileSchema } from "../profile.js";
 
 interface ExerciseInput {
   exerciseName: string;
@@ -457,6 +459,61 @@ Antwoord in het Nederlands, direct en feitelijk, max 6 zinnen. Dit is voor train
           where: { userId, ...(input.ids?.length ? { id: { in: input.ids } } : { date: input.date }) },
         });
         return { deleted: r.count };
+      },
+    },
+    {
+      name: "update_profile",
+      description:
+        "Sla (een deel van) het profiel van de gebruiker op: lengte (cm), geboortejaar, geslacht (male/female), dagelijkse activiteit (sedentary/light/moderate/active/very_active, zonder training), doel (bulk/cut/maintain), ervaring (beginner/intermediate/advanced), trainingsdagen per week en blessures. Gebruik dit zodra de gebruiker dit soort gegevens noemt, zodat je ze niet opnieuw hoeft te vragen. Geef alleen mee wat bekend is.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          heightCm: { type: "number" },
+          birthYear: { type: "number" },
+          sex: { type: "string", enum: ["male", "female"] },
+          activity: { type: "string", enum: ["sedentary", "light", "moderate", "active", "very_active"] },
+          goal: { type: "string", enum: ["bulk", "cut", "maintain"] },
+          experience: { type: "string", enum: ["beginner", "intermediate", "advanced"] },
+          trainDays: { type: "number" },
+          injuries: { type: "string" },
+        },
+      },
+      execute: async (input: Record<string, unknown>) => {
+        const parsed = profileSchema.omit({ coachNotes: true }).safeParse(input);
+        if (!parsed.success) return { error: "Ongeldige waarde in het profiel.", details: parsed.error.flatten().fieldErrors };
+        await prisma.userProfile.upsert({ where: { userId }, update: parsed.data, create: { userId, ...parsed.data } });
+        return { saved: Object.keys(parsed.data) };
+      },
+    },
+    {
+      name: "remember_note",
+      description:
+        "Onthoud een blijvend feit over de gebruiker voor toekomstige gesprekken (bv. 'knie doet pijn bij diepe squats', 'traint alleen thuis met dumbbells tot 30kg', 'wil in maart 80 kg zijn'). Kort en feitelijk, één feit per notitie. Gebruik dit uit jezelf als de gebruiker zoiets vertelt dat ook volgende week nog relevant is.",
+      inputSchema: { type: "object", properties: { note: { type: "string" } }, required: ["note"] },
+      execute: async (input: { note: string }) => {
+        const note = input.note.trim().slice(0, 200);
+        if (!note) return { error: "Lege notitie." };
+        const profile = await prisma.userProfile.findUnique({ where: { userId } });
+        const notes = parseNotes(profile?.coachNotes);
+        if (notes.some((n) => n.toLowerCase() === note.toLowerCase())) return { saved: false, reason: "Stond er al." };
+        const next = [...notes, note].slice(-40);
+        const coachNotes = JSON.stringify(next);
+        await prisma.userProfile.upsert({ where: { userId }, update: { coachNotes }, create: { userId, coachNotes } });
+        return { saved: true, totalNotes: next.length };
+      },
+    },
+    {
+      name: "forget_note",
+      description: "Verwijder een eerder onthouden notitie over de gebruiker (alle notities die de gegeven tekst bevatten).",
+      inputSchema: { type: "object", properties: { contains: { type: "string" } }, required: ["contains"] },
+      execute: async (input: { contains: string }) => {
+        const needle = input.contains.trim().toLowerCase();
+        if (!needle) return { error: "Geef tekst op." };
+        const profile = await prisma.userProfile.findUnique({ where: { userId } });
+        const notes = parseNotes(profile?.coachNotes);
+        const kept = notes.filter((n) => !n.toLowerCase().includes(needle));
+        await prisma.userProfile.upsert({ where: { userId }, update: { coachNotes: JSON.stringify(kept) }, create: { userId, coachNotes: JSON.stringify(kept) } });
+        return { removed: notes.length - kept.length };
       },
     },
     {

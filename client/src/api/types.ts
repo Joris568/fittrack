@@ -281,6 +281,7 @@ export interface MealPhotoAnalysis {
 export interface DashboardData {
   today: string;
   selected: string;
+  profileMissing: boolean;
   strip: { date: string; isToday: boolean; trained: boolean; logged: boolean; proteinHit: boolean }[];
   nutrition: {
     goal: { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number } | null;
@@ -328,4 +329,27 @@ export interface DashboardPlanned {
   programName: string | null;
   startable: boolean;
   done: boolean;
+}
+
+export interface UserProfile {
+  heightCm: number | null;
+  birthYear: number | null;
+  sex: "male" | "female" | null;
+  activity: "sedentary" | "light" | "moderate" | "active" | "very_active" | null;
+  goal: "bulk" | "cut" | "maintain" | null;
+  experience: "beginner" | "intermediate" | "advanced" | null;
+  trainDays: number | null;
+  injuries: string | null;
+}
+
+export interface ProfileResponse {
+  profile: UserProfile | null;
+  notes: string[];
+  insights: {
+    latestWeightKg: number | null;
+    age: number | null;
+    formula: number | null;
+    measured: { tdee: number; kgPerWeek: number; loggedDays: number; weighIns: number } | null;
+    suggestion: { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number; basedOn: string; goal: string } | null;
+  };
 }

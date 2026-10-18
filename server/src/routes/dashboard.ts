@@ -30,7 +30,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
   const requested = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayKey;
   const selectedKey = requested;
 
-  const [goal, sessions, foods, metrics, photoCount, latestPhotos, unlockedCount, program, plannedToday] = await Promise.all([
+  const [goal, sessions, foods, metrics, photoCount, latestPhotos, unlockedCount, program, plannedToday, profile] = await Promise.all([
     prisma.nutritionGoal.findFirst({ where: { userId }, orderBy: { effectiveFrom: "desc" } }),
     prisma.workoutSession.findMany({
       where: { userId },
@@ -70,6 +70,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
       orderBy: { createdAt: "asc" },
       include: { programDay: { select: { name: true, program: { select: { name: true } } } } },
     }),
+    prisma.userProfile.findUnique({ where: { userId }, select: { heightCm: true, goal: true, birthYear: true } }),
   ]);
 
   // ---- per-day aggregates ----
@@ -217,6 +218,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
   res.json({
     today: todayKey,
     selected: selectedKey,
+    profileMissing: !profile || !profile.heightCm || !profile.goal || !profile.birthYear,
     strip,
     nutrition: {
       goal: goal

@@ -28,6 +28,7 @@ model User {
   chatMessages  ChatMessage[]
   achievements  Achievement[]
   plannedWorkouts PlannedWorkout[]
+  profile       UserProfile?
 }
 
 // ---------- Training ----------
@@ -285,4 +286,22 @@ model AiUsage {
   cacheWriteTokens Int      @default(0)
 
   @@index([createdAt])
+}
+
+// ---------- Profile & coach memory ----------
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  heightCm    Int?
+  birthYear   Int?
+  sex         String?  // male | female
+  activity    String?  // sedentary | light | moderate | active | very_active (daily life, excluding training)
+  goal        String?  // bulk | cut | maintain
+  experience  String?  // beginner | intermediate | advanced
+  trainDays   Int?     // intended training days per week
+  injuries    String?
+  coachNotes  String?  // JSON array of short facts the coach should remember
+  updatedAt   DateTime @updatedAt
 }

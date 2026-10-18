@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { api } from "../api/client.js";
 import { BodyMetric, GamificationSummary, ProgressPhoto } from "../api/types.js";
@@ -273,6 +273,16 @@ export default function SettingsPage() {
           </div>
         )}
       </Card>
+
+      <Link to="/profile" className="block">
+        <Card className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Mijn profiel</p>
+            <p className="text-xs text-gray-500">Lengte, doel, trainingsdagen en wat de coach onthoudt</p>
+          </div>
+          <span className="text-gray-400">›</span>
+        </Card>
+      </Link>
 
       {usage && (
         <Card>
