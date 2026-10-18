@@ -23,6 +23,7 @@ import { recipeParserRouter } from "./routes/ai/recipeParser.js";
 import { goalProposalRouter } from "./routes/ai/goalProposal.js";
 import { programParserRouter } from "./routes/ai/programParser.js";
 import { progressPhotosRouter } from "./routes/progressPhotos.js";
+import { dashboardRouter } from "./routes/dashboard.js";
 import { mealPhotoRouter } from "./routes/ai/mealPhoto.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,7 @@ app.use("/api/food", requireAuth, foodRouter);
 app.use("/api/goals", requireAuth, goalsRouter);
 app.use("/api/body-metrics", requireAuth, bodyMetricsRouter);
 app.use("/api/progress-photos", requireAuth, progressPhotosRouter);
+app.use("/api/dashboard", requireAuth, dashboardRouter);
 app.use("/api/gamification", requireAuth, gamificationRouter);
 app.use("/api/recipes", requireAuth, recipesRouter);
 app.use("/api/ai/chat", requireAuth, chatRouter);

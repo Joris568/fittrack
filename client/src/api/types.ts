@@ -271,3 +271,33 @@ export interface MealPhotoAnalysis {
   notes: string | null;
   items: MealPhotoItem[];
 }
+
+export interface DashboardData {
+  today: string;
+  selected: string;
+  strip: { date: string; isToday: boolean; trained: boolean; logged: boolean; proteinHit: boolean }[];
+  nutrition: {
+    goal: { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number } | null;
+    totals: { calories: number; protein: number; carbs: number; fat: number };
+  };
+  workouts: { id: string; name: string; sets: number; volumeKg: number; prs: number }[];
+  nextWorkout: { dayId: string; dayName: string; programName: string; exerciseCount: number } | null;
+  progress: {
+    weight: { latest: number | null; delta: number | null; series: { date: string; value: number }[] };
+    calories: { average: number | null; series: { date: string; value: number }[] };
+    sessionsPerWeek: { date: string; value: number }[];
+    photos: { count: number; latest: { id: string; date: string; imageData: string }[] };
+  };
+  gamification: {
+    xp: number;
+    level: number;
+    title: string;
+    levelStartXp: number;
+    nextLevelXp: number;
+    streakWeeks: number;
+    foodStreakDays: number;
+    totalPRs: number;
+    badges: number;
+    quests: { key: string; title: string; target: number; progress: number; done: boolean; xp: number }[];
+  };
+}
