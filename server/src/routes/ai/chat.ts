@@ -4,6 +4,7 @@ import { prisma } from "../../db.js";
 import type { AuthedRequest } from "../../auth/middleware.js";
 import { buildUserContext } from "./contextBuilder.js";
 import { callClaude, callClaudeWithTools } from "./claudeClient.js";
+import { env } from "../../env.js";
 import { buildCoachTools } from "./coachTools.js";
 import { TRAINING_KNOWLEDGE_BASE } from "./knowledgeBase.js";
 
@@ -82,7 +83,12 @@ function describeChatError(err: unknown): string {
   const e = err as { status?: number; message?: string };
   const detail = (e.message ?? "").replace(/\s+/g, " ").slice(0, 160);
   let reason = "onbekende fout";
-  if (e.status === 401 || e.status === 403) reason = "de Anthropic API-key werkt niet (meer)";
+  if (e.status === 401 || e.status === 403) {
+    // Only the first characters and the length — enough to tell an old, truncated or
+    // wrongly pasted key apart from the right one, without exposing the secret.
+    const k = env.anthropicApiKey;
+    reason = `de Anthropic API-key werkt niet — de server gebruikt een key die begint met "${k.slice(0, 10)}…" en ${k.length} tekens lang is`;
+  }
   else if (e.status === 402 || /credit balance/i.test(detail)) reason = "het Anthropic-tegoed is op";
   else if (e.status === 429) reason = "te veel verzoeken achter elkaar, even wachten";
   else if (e.status === 404) reason = "het ingestelde AI-model bestaat niet";
