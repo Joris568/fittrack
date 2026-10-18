@@ -25,6 +25,7 @@ recipeParserRouter.post("/parse", async (req, res) => {
 
   try {
     const result = await callClaudeJson<ParsedRecipe>({
+      label: "recept",
       system:
         "Je bent een voedingsdeskundige. De gebruiker plakt een recept (ingrediënten en/of bereidingswijze, in willekeurige vorm). Herken de ingrediënten met hoeveelheden, schat per ingrediënt en in totaal de voedingswaarden in op basis van je kennis van voedingsmiddelen. Wees realistisch en gebruik gangbare porties/dichtheden als exacte hoeveelheden ontbreken.",
       messages: [

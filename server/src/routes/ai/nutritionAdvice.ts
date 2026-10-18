@@ -60,6 +60,8 @@ nutritionAdviceRouter.post("/generate", async (req: AuthedRequest, res) => {
 ${TRAINING_KNOWLEDGE_BASE}`,
       messages: [{ role: "user", content: `${context}\n\n${todaySummary}\n\nGeef advies voor de rest van vandaag.` }],
       maxTokens: 400,
+      label: "voedingsadvies",
+      fast: true,
     });
 
     const content = { text: advice, totals };

@@ -88,9 +88,11 @@ chatRouter.post("/checkin", async (req: AuthedRequest, res) => {
   try {
     const context = await buildUserContext(userId);
     const reply = await callClaude({
-      system: CHECKIN_SYSTEM_PROMPT + context,
+      system: CHECKIN_SYSTEM_PROMPT + context, // once a day: prompt caching would only add its write cost
       messages: [{ role: "user", content: "Open het gesprek." }],
       maxTokens: 300,
+      label: "check-in",
+      fast: true,
     });
     const message = await prisma.chatMessage.create({ data: { userId, role: "assistant", content: reply } });
     res.json(message);
@@ -157,7 +159,9 @@ async function generateReply(userId: string, trigger: TriggerMessage, history: {
   try {
     const context = await buildUserContext(userId);
     const { finalText } = await callClaudeWithTools({
-      system: todayLine() + COACH_SYSTEM_PROMPT + context,
+      // Static instructions + knowledge base are prompt-cached; the date and the user's data change.
+      system: { cached: COACH_SYSTEM_PROMPT, dynamic: todayLine() + context },
+      label: "coach",
       messages: [
         ...history
           .filter((m) => m.content.trim().length > 0) // legacy empty replies make the API reject the call

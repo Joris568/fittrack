@@ -19,6 +19,10 @@ export default function SettingsPage() {
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<{
+    total: { calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
+    byLabel: { label: string; calls: number; inputTokens: number; outputTokens: number }[];
+  } | null>(null);
   const [storage, setStorage] = useState<{ photoCount: number; photoBytes: number; chatImageBytes: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -31,6 +35,7 @@ export default function SettingsPage() {
     api.get<GamificationSummary>("/gamification/summary").then(setGamification);
     api.get<ProgressPhoto[]>("/progress-photos").then(setPhotos);
     api.get<{ photoCount: number; photoBytes: number; chatImageBytes: number }>("/export/storage").then(setStorage).catch(() => {});
+    api.get<NonNullable<typeof usage>>("/export/usage").then(setUsage).catch(() => {});
   }, []);
 
   async function addMetric(e: React.FormEvent) {
@@ -268,6 +273,42 @@ export default function SettingsPage() {
           </div>
         )}
       </Card>
+
+      {usage && (
+        <Card>
+          <h2 className="font-semibold mb-1">AI-verbruik deze maand</h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Zo houd je in de gaten wat de coach kost. Het exacte saldo zie je in je Anthropic-console onder Billing.
+          </p>
+          <div className="grid grid-cols-3 gap-2 text-center mb-3">
+            {[
+              { v: usage.total.calls, l: "aanvragen" },
+              { v: Math.round((usage.total.inputTokens + usage.total.cacheReadTokens + usage.total.cacheWriteTokens) / 1000), l: "k invoer" },
+              { v: Math.round(usage.total.outputTokens / 1000), l: "k uitvoer" },
+            ].map((x) => (
+              <div key={x.l} className="rounded-lg bg-gray-50 py-2">
+                <p className="font-display font-bold text-xl leading-none">{x.v}</p>
+                <p className="text-[10px] text-gray-500 mt-1">{x.l}</p>
+              </div>
+            ))}
+          </div>
+          {usage.total.cacheReadTokens > 0 && (
+            <p className="text-xs text-gray-500 mb-2">
+              {Math.round(usage.total.cacheReadTokens / 1000)}k invoer kwam uit de cache (veel goedkoper).
+            </p>
+          )}
+          <div className="space-y-1">
+            {usage.byLabel.map((b) => (
+              <div key={b.label} className="flex justify-between text-xs text-gray-600">
+                <span>{b.label}</span>
+                <span>
+                  {b.calls}x · {Math.round(b.inputTokens / 1000)}k in / {Math.round(b.outputTokens / 1000)}k uit
+                </span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card>
         <h2 className="font-semibold mb-1">Back-up &amp; opslag</h2>

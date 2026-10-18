@@ -34,6 +34,7 @@ goalProposalRouter.post("/generate", async (req: AuthedRequest, res) => {
 
   try {
     const result = await callClaudeJson<GoalProposalPayload>({
+      label: "doel-voorstel",
       system: `Je bent een directe, evidence-based coach die de gebruiker blijft pushen in plaats van alleen data terug te lezen. Kijk kritisch naar de voortgang van de afgelopen weken (consistentie, volume, voeding, gewichtstrend) en:
 1. Formuleer één scherpe, persoonlijke uitdagende vraag of observatie ("challenge") die de gebruiker aan het denken zet over waar hij achterblijft of wat beter kan.
 2. Onderbouw kort waarom (2-3 zinnen, met concrete cijfers uit de data).

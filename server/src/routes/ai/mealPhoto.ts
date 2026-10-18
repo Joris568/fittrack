@@ -36,6 +36,7 @@ mealPhotoRouter.post("/analyze", async (req, res) => {
 
   try {
     const meal = await callClaudeJson<VisionMeal>({
+      label: "maaltijdfoto",
       system:
         "Je bent een voedingsdeskundige die een foto van een maaltijd analyseert. Splits het gerecht op in losse, zoekbare voedingsmiddelen (bijv. 'gekookte rijst', 'kipfilet gebakken', 'broccoli gekookt') in plaats van het hele gerecht als één item. Schat per onderdeel het gewicht in gram zoals het op het bord ligt (gebruik bord-/portiegrootte als referentie), en geef realistische voedingswaarden per 100g. Houd rekening met zichtbaar vet of saus als aparte items (bijv. olijfolie, dressing) als dat duidelijk te zien is. Wees eerlijk als iets onduidelijk is: noem het dan in 'notes'. Staat er geen eten op de foto, geef dan een lege items-lijst.",
       messages: [{ role: "user", content: "Analyseer deze maaltijd." }],

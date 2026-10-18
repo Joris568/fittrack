@@ -392,7 +392,7 @@ Antwoord in het Nederlands, direct en feitelijk, max 6 zinnen. Dit is voor train
     {
       name: "plan_workouts",
       description:
-        "Plan één of meer trainingen in de agenda van de gebruiker. Geef per training de datum (YYYY-MM-DD) en óf programName + dayName van een bestaande trainingsdag (zie list_programs), óf een eigen title (bv. 'Cardio'). Gebruik dit ook om een hele week of meerdere weken in één keer in te plannen. De datum van vandaag staat bovenaan je instructies.",
+        "Plan één of meer trainingen in de agenda van de gebruiker. Geef per training de datum (YYYY-MM-DD) en óf programName + dayName van een bestaande trainingsdag (zie list_programs), óf een eigen title (bv. 'Cardio'). Gebruik dit ook om een hele week of meerdere weken in één keer in te plannen. De datum van vandaag staat in je instructies.",
       inputSchema: {
         type: "object",
         properties: {

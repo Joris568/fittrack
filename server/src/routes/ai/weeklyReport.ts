@@ -18,6 +18,7 @@ interface WeeklyReportPayload {
 async function generateReport(userId: string) {
   const context = await buildUserContext(userId);
   const result = await callClaudeJson<WeeklyReportPayload>({
+      label: "weekrapport",
     system: `Je bent een kracht- en voedingscoach die elke week een kort voortgangsrapport schrijft op basis van de data van de gebruiker. Wees eerlijk en specifiek, gebruik concrete cijfers uit de data waar mogelijk (bv. sets per spiergroep versus de aanbevolen range, eiwitinname versus doel). Antwoord in het Nederlands.
 
 ${TRAINING_KNOWLEDGE_BASE}`,

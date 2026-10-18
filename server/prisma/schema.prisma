@@ -270,3 +270,19 @@ model PlannedWorkout {
 
   @@index([userId, date])
 }
+
+// ---------- AI usage ----------
+
+// One row per Claude API call, so the app can show how much it is actually using.
+model AiUsage {
+  id               String   @id @default(cuid())
+  createdAt        DateTime @default(now())
+  label            String   // coach | checkin | advice | ...
+  model            String
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int      @default(0)
+  cacheWriteTokens Int      @default(0)
+
+  @@index([createdAt])
+}

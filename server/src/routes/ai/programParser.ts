@@ -26,6 +26,7 @@ programParserRouter.post("/parse", async (req, res) => {
 
   try {
     const result = await callClaudeJson<ParsedProgram>({
+      label: "schema-import",
       system:
         "Je bent een krachttrainingscoach. De gebruiker plakt een trainingsschema in willekeurige vorm (tekst, lijst, tabel-achtig). Herken de trainingsdagen en per dag de oefeningen met sets/reps/gewicht. Gebruik standaard Nederlandse of Engelse oefeningnamen zoals ze gangbaar zijn in een sportschool (bv. 'Bankdrukken', 'Squat', 'Lat pulldown'). Als sets/reps niet genoemd worden, gebruik een redelijke standaard (3 sets, 8-12 reps). Als gewicht niet genoemd wordt, laat het weg.",
       messages: [{ role: "user", content: `Schema:\n${parsed.data.text}\n\nAnalyseer dit trainingsschema.` }],

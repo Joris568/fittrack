@@ -60,6 +60,7 @@ workoutSuggestionsRouter.post("/generate", async (req: AuthedRequest, res) => {
 
   try {
     const result = await callClaudeJson<SuggestionPayload>({
+      label: "schema-advies",
       system: `Je bent een ervaren krachttrainingscoach. Analyseer de trainingsgeschiedenis en het huidige programma en stel per oefening een concrete aanpassing voor (verzwaren, deload, reps ophogen, oefening vervangen, of gelijk houden) inclusief korte onderbouwing die verwijst naar concrete cijfers uit de geschiedenis (RPE, herhalingen, gewicht, aantal sets per spiergroep per week). Gebruik ALTIJD de exacte programExerciseId zoals aangegeven tussen [blokhaken] in het programma.
 
 ${TRAINING_KNOWLEDGE_BASE}`,

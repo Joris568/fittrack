@@ -48,3 +48,29 @@ exportRouter.get("/storage", async (req: AuthedRequest, res) => {
 function prismaParam() {
   return (process.env.DATABASE_URL ?? "").startsWith("file:") ? "?" : "$1";
 }
+
+/** Claude API usage this month, so spending is never a surprise. */
+exportRouter.get("/usage", async (_req: AuthedRequest, res) => {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const rows = await prisma.aiUsage.findMany({ where: { createdAt: { gte: monthStart } } });
+  const byLabel = new Map<string, { calls: number; inputTokens: number; outputTokens: number }>();
+  const total = { calls: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+  for (const r of rows) {
+    total.calls++;
+    total.inputTokens += r.inputTokens;
+    total.outputTokens += r.outputTokens;
+    total.cacheReadTokens += r.cacheReadTokens;
+    total.cacheWriteTokens += r.cacheWriteTokens;
+    const l = byLabel.get(r.label) ?? { calls: 0, inputTokens: 0, outputTokens: 0 };
+    l.calls++;
+    l.inputTokens += r.inputTokens + r.cacheReadTokens + r.cacheWriteTokens;
+    l.outputTokens += r.outputTokens;
+    byLabel.set(r.label, l);
+  }
+  res.json({
+    since: monthStart.toISOString(),
+    total,
+    byLabel: [...byLabel.entries()].map(([label, v]) => ({ label, ...v })).sort((a, b) => b.calls - a.calls),
+  });
+});
