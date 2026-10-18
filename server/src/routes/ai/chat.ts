@@ -5,7 +5,7 @@ import type { AuthedRequest } from "../../auth/middleware.js";
 import { buildUserContext } from "./contextBuilder.js";
 import { callClaude, callClaudeWithTools } from "./claudeClient.js";
 import { env } from "../../env.js";
-import { buildCoachTools } from "./coachTools.js";
+import { amsterdamDayKey, buildCoachTools } from "./coachTools.js";
 import { TRAINING_KNOWLEDGE_BASE } from "./knowledgeBase.js";
 
 export const chatRouter = Router();
@@ -27,6 +27,8 @@ Onderbouw waar relevant met de kennisbasis (volume-ranges, eiwitrichtlijnen, sur
 Je kunt ook echt dingen aanpassen in de app via de beschikbare acties (tools) — niet alleen erover praten. Als de gebruiker vraagt om een schema te maken, een oefening toe te voegen/aan te passen/te verwijderen, of een voedingsdoel in te stellen: doe dit direct via de bijbehorende actie, vraag niet eerst om bevestiging tenzij iets destructiefs is (zoals een heel programma vervangen). Gebruik altijd eerst list_programs om de exacte huidige namen te weten voordat je een bestaand programma wijzigt.
 Schrijf een schema NOOIT eerst volledig uit in platte tekst voordat je het bouwt — dat kost onnodig veel tokens en kan halverwege afgekapt worden. Roep bij een verzoek om een (volledig/meerdaags) schema meteen create_program aan met alle dagen en oefeningen in één keer; gebruik add_exercise_to_program alleen voor losse toevoegingen aan een bestaand programma. Meld pas ná het uitvoeren van de tools kort en concreet wat je hebt gedaan (geen technische details, gewoon in mensentaal: "Ik heb Schouderdrukken toegevoegd aan je Push-dag met 3x10-15").
 Je KUNT voortgangsfoto's wel degelijk beoordelen: via analyze_physique_photo zie je de foto's van de gebruiker echt. Zeg dus NOOIT dat je foto's niet kunt bekijken of beoordelen. Noemt de gebruiker foto's, of zegt hij er net een of meer geüpload te hebben, roep dan altijd eerst analyze_physique_photo aan en baseer je antwoord op wat daaruit komt. Geeft de tool een foutmelding dat er geen foto is, vraag dan om een foto via het camera-knopje.
+Verwijderen: vraagt de gebruiker uitdrukkelijk om iets te verwijderen (een programma, trainingsdag, gelogde training, eten, meting, foto of geplande training), doe dat dan direct met de verwijder-acties — zoek eerst het juiste id op met de bijbehorende list_-actie. Vraag alleen door als onduidelijk is welk item bedoeld wordt, of als het om "alles" gaat (bv. al het eten of alle programma's). Zeg erbij wat je precies hebt verwijderd; dat kan niet ongedaan gemaakt worden.
+Agenda: je kunt trainingen plannen in de agenda van de gebruiker (plan_workouts, list_planned_workouts, delete_planned_workouts). Plan bij een verzoek als "plan mijn week" meteen alle sessies in op echte datums, gebaseerd op de dagen van zijn programma en de datum van vandaag, en meld welke dag wanneer staat.
 Een "brede V-taper" of ideale lichaamsbouw is voor iedereen anders (schouderbreedte, torso-lengte, huidige verhoudingen verschillen per persoon) — geef daarom nooit generiek V-taper-advies. Als de gebruiker vraagt naar zijn bouw/physique, hoe hij eruitziet, of om lichaamsspecifiek advies: gebruik eerst analyze_physique_photo om zijn/haar daadwerkelijke lichaamsbouw te bekijken, en pas daarna het trainings- en voedingsadvies (via update_program_exercise, add_exercise_to_program, set_nutrition_goal) aan op wat die analyse concreet laat zien.
 Antwoord in het Nederlands, gebruik korte alinea's of bullet points waar dat helpt.
 
@@ -98,6 +100,12 @@ function describeChatError(err: unknown): string {
   return `Er ging iets mis bij het verwerken van je bericht (${reason}). Probeer het nog eens.${detail ? `\n\nTechnisch: ${detail}` : ""}`;
 }
 
+function todayLine(): string {
+  const now = new Date();
+  const weekday = now.toLocaleDateString("nl-NL", { weekday: "long", timeZone: "Europe/Amsterdam" });
+  return `Vandaag is het ${weekday} ${amsterdamDayKey(now)} (Nederlandse tijd). Gebruik dit voor datums als "morgen" of "volgende week maandag".\n\n`;
+}
+
 const chatSchema = z.object({ message: z.string().min(1) });
 
 chatRouter.post("/", async (req: AuthedRequest, res) => {
@@ -128,7 +136,7 @@ chatRouter.post("/", async (req: AuthedRequest, res) => {
 
   try {
     const { finalText } = await callClaudeWithTools({
-      system: COACH_SYSTEM_PROMPT + context,
+      system: todayLine() + COACH_SYSTEM_PROMPT + context,
       messages: [
         ...orderedHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         { role: "user", content: parsed.data.message },

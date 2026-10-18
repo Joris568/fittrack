@@ -26,6 +26,7 @@ model User {
   insights      AiInsight[]
   chatMessages  ChatMessage[]
   achievements  Achievement[]
+  plannedWorkouts PlannedWorkout[]
 }
 
 // ---------- Training ----------
@@ -64,6 +65,7 @@ model ProgramDay {
 
   exercises ProgramExercise[]
   sessions  WorkoutSession[]
+  plannedWorkouts PlannedWorkout[]
 }
 
 model ProgramExercise {
@@ -244,4 +246,24 @@ model Achievement {
   unlockedAt DateTime @default(now())
 
   @@unique([userId, key])
+}
+
+// ---------- Agenda ----------
+
+// A workout the user planned for a specific calendar day. `date` is a local-day key
+// ("YYYY-MM-DD") rather than a timestamp, so it never shifts across timezones.
+model PlannedWorkout {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  date         String
+  programDayId String?
+  programDay   ProgramDay? @relation(fields: [programDayId], references: [id], onDelete: SetNull)
+  title        String?
+  notes        String?
+  sessionId    String?  // set when the planned workout was started from the agenda
+  done         Boolean  @default(false) // manual check-off, e.g. for a free-text plan like "cardio"
+  createdAt    DateTime @default(now())
+
+  @@index([userId, date])
 }

@@ -30,7 +30,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
   const requested = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayKey;
   const selectedKey = requested;
 
-  const [goal, sessions, foods, metrics, photoCount, latestPhotos, unlockedCount, program] = await Promise.all([
+  const [goal, sessions, foods, metrics, photoCount, latestPhotos, unlockedCount, program, plannedToday] = await Promise.all([
     prisma.nutritionGoal.findFirst({ where: { userId }, orderBy: { effectiveFrom: "desc" } }),
     prisma.workoutSession.findMany({
       where: { userId },
@@ -64,6 +64,11 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
       where: { userId },
       orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
       include: { days: { orderBy: { order: "asc" }, include: { _count: { select: { exercises: true } } } } },
+    }),
+    prisma.plannedWorkout.findMany({
+      where: { userId, date: selectedKey },
+      orderBy: { createdAt: "asc" },
+      include: { programDay: { select: { name: true, program: { select: { name: true } } } } },
     }),
   ]);
 
@@ -167,6 +172,17 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
     prs: s.setLogs.filter((l) => l.isPR).length,
   }));
 
+  const selectedPlanned = plannedToday.map((p) => ({
+    id: p.id,
+    title: p.programDay?.name ?? p.title ?? "Training",
+    programName: p.programDay?.program.name ?? null,
+    startable: !!p.programDayId,
+    done:
+      p.done ||
+      (!!p.sessionId && sessions.some((s) => s.id === p.sessionId)) ||
+      (!!p.programDayId && (sessionsByDay.get(selectedKey) ?? []).some((s) => s.programDayId === p.programDayId)),
+  }));
+
   // next program day after the one trained last (cycling), or the first day
   let nextWorkout: { dayId: string; dayName: string; programName: string; exerciseCount: number } | null = null;
   if (program && program.days.length > 0) {
@@ -214,6 +230,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
       },
     },
     workouts: selectedSessions,
+    planned: selectedPlanned,
     nextWorkout,
     progress: {
       weight: { latest: metrics.length ? metrics[metrics.length - 1].weightKg : null, delta: weightDelta, series: weightSeries },

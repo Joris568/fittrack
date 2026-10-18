@@ -23,6 +23,22 @@ const exerciseInputSchema = {
   required: ["exerciseName", "targetSets", "targetRepsMin", "targetRepsMax"],
 };
 
+
+const dayFormat = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Amsterdam" });
+/** Local (Dutch) calendar day as "YYYY-MM-DD" — the coach talks to a Dutch user, and the
+ * server itself runs in UTC. */
+export function amsterdamDayKey(d: Date): string {
+  return dayFormat.format(d);
+}
+
+function shiftDayKey(dayKey: string, days: number): string {
+  const d = new Date(`${dayKey}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+const dayKeyProp = { type: "string", description: "Datum als YYYY-MM-DD" };
+
 /** The coach's real actions — every one is scoped to `userId` so the chat can
  * never touch another user's data (moot for this single-user app, but kept
  * consistent with the rest of the API). */
@@ -224,6 +240,223 @@ export function buildCoachTools(userId: string): AgentTool[] {
 Antwoord in het Nederlands, direct en feitelijk, max 6 zinnen. Dit is voor trainingsadvies, geen medisch of lichaamsbeeld-oordeel.`,
         });
         return { analysis, photosAnalyzed: photos.length, mostRecentDate: photos[0].date };
+      },
+    },
+    {
+      name: "list_workouts",
+      description:
+        "Haal recente gelogde trainingen (sessies) op met hun id, datum, naam en aantal sets. Gebruik dit om het juiste id te vinden voordat je een training verwijdert.",
+      inputSchema: {
+        type: "object",
+        properties: { limit: { type: "number", description: "Max aantal, standaard 10" }, date: dayKeyProp },
+      },
+      execute: async (input: { limit?: number; date?: string }) => {
+        const sessions = await prisma.workoutSession.findMany({
+          where: { userId },
+          orderBy: { date: "desc" },
+          take: Math.min(input.limit ?? 10, 40),
+          include: { programDay: { select: { name: true } }, _count: { select: { setLogs: true } } },
+        });
+        return sessions
+          .map((s) => ({ id: s.id, date: amsterdamDayKey(s.date), name: s.programDay?.name ?? "Vrije training", sets: s._count.setLogs }))
+          .filter((s) => !input.date || s.date === input.date);
+      },
+    },
+    {
+      name: "delete_workout_session",
+      description: "Verwijder één gelogde training (met al haar sets) definitief. Alleen op uitdrukkelijk verzoek. Haal het id op via list_workouts.",
+      inputSchema: { type: "object", properties: { sessionId: { type: "string" } }, required: ["sessionId"] },
+      execute: async (input: { sessionId: string }) => {
+        const r = await prisma.workoutSession.deleteMany({ where: { id: input.sessionId, userId } });
+        return r.count ? { deleted: true } : { error: "Training niet gevonden." };
+      },
+    },
+    {
+      name: "delete_program",
+      description: "Verwijder een heel trainingsprogramma (alle dagen en oefeningen daarin) definitief. Gelogde trainingen blijven bestaan. Alleen op uitdrukkelijk verzoek.",
+      inputSchema: { type: "object", properties: { programName: { type: "string" } }, required: ["programName"] },
+      execute: async (input: { programName: string }) => {
+        const programs = await prisma.workoutProgram.findMany({ where: { userId } });
+        const match = programs.find((p) => p.name.toLowerCase() === input.programName.toLowerCase());
+        if (!match) return { error: `Programma "${input.programName}" niet gevonden.`, available: programs.map((p) => p.name) };
+        await prisma.workoutProgram.delete({ where: { id: match.id } });
+        return { deleted: true, name: match.name };
+      },
+    },
+    {
+      name: "delete_program_day",
+      description: "Verwijder één trainingsdag (met zijn oefeningen) uit een programma. Alleen op uitdrukkelijk verzoek.",
+      inputSchema: {
+        type: "object",
+        properties: { programName: { type: "string" }, dayName: { type: "string" } },
+        required: ["programName", "dayName"],
+      },
+      execute: async (input: { programName: string; dayName: string }) => {
+        const programs = await prisma.workoutProgram.findMany({ where: { userId }, include: { days: true } });
+        const program = programs.find((p) => p.name.toLowerCase() === input.programName.toLowerCase());
+        const day = program?.days.find((d) => d.name.toLowerCase() === input.dayName.toLowerCase());
+        if (!program || !day) return { error: "Programma of dag niet gevonden." };
+        await prisma.programDay.delete({ where: { id: day.id } });
+        return { deleted: true, dayName: day.name };
+      },
+    },
+    {
+      name: "list_food_log",
+      description: "Haal het gelogde eten van één dag op (standaard vandaag), met id, maaltijd, product en gewicht. Gebruik dit om het juiste id te vinden voordat je eten verwijdert.",
+      inputSchema: { type: "object", properties: { date: dayKeyProp } },
+      execute: async (input: { date?: string }) => {
+        const key = input.date ?? amsterdamDayKey(new Date());
+        // Wide window, then filter on the Dutch calendar day, so evening/night entries land on the right day.
+        const center = new Date(`${key}T12:00:00Z`);
+        const entries = await prisma.foodLogEntry.findMany({
+          where: { userId, date: { gte: new Date(center.getTime() - 36 * 3600_000), lte: new Date(center.getTime() + 36 * 3600_000) } },
+          include: { foodItem: true },
+          orderBy: { date: "asc" },
+        });
+        return entries
+          .filter((e) => amsterdamDayKey(e.date) === key)
+          .map((e) => ({
+            id: e.id,
+            meal: e.mealType,
+            name: e.foodItem.name,
+            grams: e.quantityGrams,
+            kcal: Math.round((e.foodItem.caloriesPer100g * e.quantityGrams) / 100),
+          }));
+      },
+    },
+    {
+      name: "delete_food_log_entries",
+      description: "Verwijder één of meer gelogde eten-regels definitief. Alleen op uitdrukkelijk verzoek. Haal de id's op via list_food_log.",
+      inputSchema: { type: "object", properties: { entryIds: { type: "array", items: { type: "string" } } }, required: ["entryIds"] },
+      execute: async (input: { entryIds: string[] }) => {
+        const r = await prisma.foodLogEntry.deleteMany({ where: { userId, id: { in: input.entryIds } } });
+        return { deleted: r.count };
+      },
+    },
+    {
+      name: "list_body_metrics",
+      description: "Haal de laatste gewicht-/lichaamsmetingen op met id en datum. Gebruik dit om het juiste id te vinden voordat je een meting verwijdert.",
+      inputSchema: { type: "object", properties: { limit: { type: "number" } } },
+      execute: async (input: { limit?: number }) => {
+        const metrics = await prisma.bodyMetric.findMany({ where: { userId }, orderBy: { date: "desc" }, take: Math.min(input.limit ?? 10, 40) });
+        return metrics.map((m) => ({ id: m.id, date: amsterdamDayKey(m.date), weightKg: m.weightKg, bodyFatPct: m.bodyFatPct }));
+      },
+    },
+    {
+      name: "delete_body_metric",
+      description: "Verwijder één lichaamsmeting (gewicht) definitief. Alleen op uitdrukkelijk verzoek.",
+      inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+      execute: async (input: { id: string }) => {
+        const r = await prisma.bodyMetric.deleteMany({ where: { id: input.id, userId } });
+        return r.count ? { deleted: true } : { error: "Meting niet gevonden." };
+      },
+    },
+    {
+      name: "list_progress_photos",
+      description: "Haal de voortgangsfoto's op (alleen id en datum, geen beeld). Gebruik dit om het juiste id te vinden voordat je een foto verwijdert.",
+      inputSchema: { type: "object", properties: {} },
+      execute: async () => {
+        const photos = await prisma.progressPhoto.findMany({ where: { userId }, orderBy: { date: "desc" }, select: { id: true, date: true }, take: 40 });
+        return photos.map((p) => ({ id: p.id, date: amsterdamDayKey(p.date) }));
+      },
+    },
+    {
+      name: "delete_progress_photo",
+      description: "Verwijder één voortgangsfoto definitief. Alleen op uitdrukkelijk verzoek.",
+      inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+      execute: async (input: { id: string }) => {
+        const r = await prisma.progressPhoto.deleteMany({ where: { id: input.id, userId } });
+        return r.count ? { deleted: true } : { error: "Foto niet gevonden." };
+      },
+    },
+    {
+      name: "list_planned_workouts",
+      description: "Haal de geplande trainingen uit de agenda op (standaard vanaf vandaag tot 28 dagen vooruit), met id, datum en naam.",
+      inputSchema: { type: "object", properties: { from: dayKeyProp, to: dayKeyProp } },
+      execute: async (input: { from?: string; to?: string }) => {
+        const today = amsterdamDayKey(new Date());
+        const planned = await prisma.plannedWorkout.findMany({
+          where: { userId, date: { gte: input.from ?? today, lte: input.to ?? shiftDayKey(today, 28) } },
+          orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+          include: { programDay: { select: { name: true, program: { select: { name: true } } } } },
+        });
+        return planned.map((p) => ({
+          id: p.id,
+          date: p.date,
+          name: p.programDay?.name ?? p.title,
+          program: p.programDay?.program.name ?? null,
+          done: p.done,
+        }));
+      },
+    },
+    {
+      name: "plan_workouts",
+      description:
+        "Plan één of meer trainingen in de agenda van de gebruiker. Geef per training de datum (YYYY-MM-DD) en óf programName + dayName van een bestaande trainingsdag (zie list_programs), óf een eigen title (bv. 'Cardio'). Gebruik dit ook om een hele week of meerdere weken in één keer in te plannen. De datum van vandaag staat bovenaan je instructies.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          workouts: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                date: dayKeyProp,
+                programName: { type: "string" },
+                dayName: { type: "string" },
+                title: { type: "string" },
+                notes: { type: "string" },
+              },
+              required: ["date"],
+            },
+          },
+        },
+        required: ["workouts"],
+      },
+      execute: async (input: {
+        workouts: { date: string; programName?: string; dayName?: string; title?: string; notes?: string }[];
+      }) => {
+        const programs = await prisma.workoutProgram.findMany({ where: { userId }, include: { days: true } });
+        const created: { date: string; name: string }[] = [];
+        const errors: string[] = [];
+        for (const w of input.workouts) {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(w.date)) {
+            errors.push(`Ongeldige datum "${w.date}"`);
+            continue;
+          }
+          let programDayId: string | undefined;
+          if (w.dayName) {
+            const candidates = w.programName
+              ? programs.filter((p) => p.name.toLowerCase() === w.programName!.toLowerCase())
+              : programs;
+            const day = candidates.flatMap((p) => p.days).find((d) => d.name.toLowerCase() === w.dayName!.toLowerCase());
+            if (!day) {
+              errors.push(`Dag "${w.dayName}" niet gevonden voor ${w.date}`);
+              continue;
+            }
+            programDayId = day.id;
+          } else if (!w.title) {
+            errors.push(`Geen dag of titel voor ${w.date}`);
+            continue;
+          }
+          await prisma.plannedWorkout.create({
+            data: { userId, date: w.date, programDayId, title: programDayId ? undefined : w.title, notes: w.notes },
+          });
+          created.push({ date: w.date, name: w.dayName ?? w.title! });
+        }
+        return { planned: created, errors };
+      },
+    },
+    {
+      name: "delete_planned_workouts",
+      description: "Verwijder geplande trainingen uit de agenda: per id (via list_planned_workouts), of alle geplande trainingen op één datum. Alleen op uitdrukkelijk verzoek.",
+      inputSchema: { type: "object", properties: { ids: { type: "array", items: { type: "string" } }, date: dayKeyProp } },
+      execute: async (input: { ids?: string[]; date?: string }) => {
+        if (!input.ids?.length && !input.date) return { error: "Geef ids of een datum." };
+        const r = await prisma.plannedWorkout.deleteMany({
+          where: { userId, ...(input.ids?.length ? { id: { in: input.ids } } : { date: input.date }) },
+        });
+        return { deleted: r.count };
       },
     },
     {

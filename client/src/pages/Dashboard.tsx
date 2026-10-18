@@ -193,6 +193,16 @@ export default function Dashboard() {
     }
   }
 
+  async function startPlanned(id: string) {
+    setStarting(true);
+    try {
+      const session = await api.post<{ id: string }>(`/calendar/planned/${id}/start`);
+      navigate(`/train/session/${session.id}`);
+    } catch {
+      setStarting(false);
+    }
+  }
+
   async function startWorkout(dayId: string) {
     setStarting(true);
     try {
@@ -247,7 +257,7 @@ export default function Dashboard() {
 
       <Card>
         <SectionTitle>Training</SectionTitle>
-        {data.workouts.length > 0 ? (
+        {(data.workouts.length > 0 || data.planned.length > 0) && (
           <div className="space-y-2">
             {data.workouts.map((w) => (
               <Link key={w.id} to={`/train/session/${w.id}`} className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5">
@@ -262,33 +272,61 @@ export default function Dashboard() {
                 <span className="text-gray-400">›</span>
               </Link>
             ))}
+            {data.planned.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 rounded-lg border border-gray-200 px-3 py-2.5">
+                <span
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-sm shrink-0 ${
+                    p.done ? "bg-gray-400 text-white" : "border-2 border-brand-500"
+                  }`}
+                >
+                  {p.done && "✓"}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium text-sm truncate ${p.done ? "text-gray-400 line-through" : ""}`}>{p.title}</p>
+                  <p className="text-xs text-gray-500 truncate">Gepland{p.programName ? ` · ${p.programName}` : ""}</p>
+                </div>
+                {!p.done && p.startable && (
+                  <Button className="!px-3 !py-1.5 text-xs" onClick={() => startPlanned(p.id)} disabled={starting}>
+                    {starting ? "..." : "Start"}
+                  </Button>
+                )}
+              </div>
+            ))}
           </div>
-        ) : isToday && data.nextWorkout ? (
-          <div className="flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500">Volgende training</p>
-              <p className="font-display font-bold text-lg truncate">{data.nextWorkout.dayName}</p>
-              <p className="text-xs text-gray-500 truncate">
-                {data.nextWorkout.programName} · {data.nextWorkout.exerciseCount} oefeningen
-              </p>
+        )}
+        {data.workouts.length === 0 && data.planned.length === 0 && (
+          isToday && data.nextWorkout ? (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500">Volgende training</p>
+                <p className="font-display font-bold text-lg truncate">{data.nextWorkout.dayName}</p>
+                <p className="text-xs text-gray-500 truncate">
+                  {data.nextWorkout.programName} · {data.nextWorkout.exerciseCount} oefeningen
+                </p>
+              </div>
+              <Button onClick={() => startWorkout(data.nextWorkout!.dayId)} disabled={starting}>
+                {starting ? "..." : "Start"}
+              </Button>
             </div>
-            <Button onClick={() => startWorkout(data.nextWorkout!.dayId)} disabled={starting}>
-              {starting ? "..." : "Start"}
-            </Button>
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500">
-            {isToday ? "Nog geen programma." : "Geen training op deze dag."}{" "}
-            <Link to="/train" className="text-brand-600 font-medium">
-              {isToday ? "Naar trainen" : "Alle trainingen"}
-            </Link>
-          </p>
+          ) : (
+            <p className="text-sm text-gray-500">
+              {isToday ? "Nog geen programma." : "Geen training op deze dag."}{" "}
+              <Link to="/train" className="text-brand-600 font-medium">
+                {isToday ? "Naar trainen" : "Alle trainingen"}
+              </Link>
+            </p>
+          )
         )}
-        {isToday && data.workouts.length > 0 && (
-          <Link to="/train" className="block text-center text-sm text-brand-600 font-medium mt-3">
-            Nog een training starten
+        <div className="flex justify-between mt-3 text-sm font-medium">
+          <Link to="/agenda" className="text-brand-600">
+            Agenda openen
           </Link>
-        )}
+          {isToday && data.workouts.length > 0 && (
+            <Link to="/train" className="text-brand-600">
+              Nog een training starten
+            </Link>
+          )}
+        </div>
       </Card>
 
       <div>

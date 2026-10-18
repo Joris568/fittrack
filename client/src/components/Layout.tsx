@@ -31,6 +31,16 @@ const tabs = [
     ),
   },
   {
+    to: "/agenda",
+    label: "Agenda",
+    icon: (
+      <Icon>
+        <rect x="4" y="6" width="16" height="14" rx="2" />
+        <path d="M4 10.5h16M8.5 4v4M15.5 4v4" />
+      </Icon>
+    ),
+  },
+  {
     to: "/train",
     label: "Trainen",
     icon: (

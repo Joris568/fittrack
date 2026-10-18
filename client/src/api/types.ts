@@ -281,6 +281,7 @@ export interface DashboardData {
     totals: { calories: number; protein: number; carbs: number; fat: number };
   };
   workouts: { id: string; name: string; sets: number; volumeKg: number; prs: number }[];
+  planned: DashboardPlanned[];
   nextWorkout: { dayId: string; dayName: string; programName: string; exerciseCount: number } | null;
   progress: {
     weight: { latest: number | null; delta: number | null; series: { date: string; value: number }[] };
@@ -300,4 +301,25 @@ export interface DashboardData {
     badges: number;
     quests: { key: string; title: string; target: number; progress: number; done: boolean; xp: number }[];
   };
+}
+
+export interface CalendarDay {
+  sessions: { id: string; name: string; sets: number; volumeKg: number; prs: number }[];
+  planned: {
+    id: string;
+    title: string;
+    programDayId: string | null;
+    programName: string | null;
+    notes: string | null;
+    done: boolean;
+  }[];
+  foodLogged: boolean;
+}
+
+export interface DashboardPlanned {
+  id: string;
+  title: string;
+  programName: string | null;
+  startable: boolean;
+  done: boolean;
 }
