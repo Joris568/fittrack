@@ -20,6 +20,12 @@ export default function Agenda() {
   const [choice, setChoice] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [busy, setBusy] = useState(false);
+  const [repeatWeeks, setRepeatWeeks] = useState(1);
+  const [planning, setPlanning] = useState(false);
+  const [weekProgram, setWeekProgram] = useState("");
+  const [weekdays, setWeekdays] = useState<number[]>([0, 2, 4]);
+  const [weekCount, setWeekCount] = useState(4);
+  const [planMessage, setPlanMessage] = useState<string | null>(null);
 
   // Whole weeks covering the month, so the grid has no gaps.
   const cells = useMemo(() => {
@@ -71,14 +77,49 @@ export default function Agenda() {
       await api.post("/calendar/planned", {
         date: selected,
         ...(choice ? { programDayId: choice } : { title: customTitle.trim() }),
+        ...(repeatWeeks > 1 ? { repeatWeeks } : {}),
       });
       setAdding(false);
       setChoice("");
       setCustomTitle("");
+      setRepeatWeeks(1);
       await load();
     } finally {
       setBusy(false);
     }
+  }
+
+  async function openPlanning() {
+    setPlanning(true);
+    setPlanMessage(null);
+    const list = programs ?? (await api.get<WorkoutProgram[]>("/programs"));
+    setPrograms(list);
+    if (!weekProgram && list.length) setWeekProgram((list.find((p) => p.isActive) ?? list[0]).id);
+  }
+
+  async function planWeeks() {
+    if (!weekProgram || weekdays.length === 0) return;
+    setBusy(true);
+    try {
+      const res = await api.post<{ created: number }>("/calendar/plan-week", {
+        programId: weekProgram,
+        weekdays,
+        weeks: weekCount,
+        startDate: today,
+      });
+      setPlanMessage(res.created > 0 ? `${res.created} trainingen ingepland.` : "Alles stond er al.");
+      await load();
+    } catch {
+      setPlanMessage("Inplannen mislukt.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function moveToToday(id: string) {
+    await api.patch(`/calendar/planned/${id}`, { date: today });
+    setSelected(today);
+    await load();
   }
 
   async function startPlanned(id: string) {
@@ -147,6 +188,7 @@ export default function Agenda() {
             const isSelected = key === selected;
             const trained = d?.sessions.length ?? 0;
             const open = d?.planned.filter((p) => !p.done).length ?? 0;
+            const missed = key < today && open > 0;
             const doneAll = (d?.planned.length ?? 0) > 0 && open === 0;
             return (
               <button
@@ -163,7 +205,11 @@ export default function Agenda() {
                 <span className="flex gap-0.5 mt-1.5 h-2 items-center">
                   {trained > 0 && <span className="w-2 h-2 rounded-full bg-brand-500" />}
                   {open > 0 && (
-                    <span className={`w-2 h-2 rounded-full border-[1.5px] ${isSelected ? "border-white" : "border-brand-500"}`} />
+                    <span
+                      className={`w-2 h-2 rounded-full border-[1.5px] ${
+                        isSelected ? "border-white" : missed ? "border-red-500 bg-red-100" : "border-brand-500"
+                      }`}
+                    />
                   )}
                   {doneAll && trained === 0 && <span className="w-2 h-2 rounded-full bg-gray-400" />}
                   {d?.foodLogged && trained === 0 && open === 0 && !doneAll && (
@@ -180,6 +226,9 @@ export default function Agenda() {
           </span>
           <span className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full border-[1.5px] border-brand-500" /> gepland
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full border-[1.5px] border-red-500 bg-red-100" /> gemist
           </span>
         </p>
       </div>
@@ -215,9 +264,16 @@ export default function Agenda() {
               </span>
               <div className="flex-1 min-w-0">
                 <p className={`font-medium text-sm truncate ${p.done ? "text-gray-400 line-through" : ""}`}>{p.title}</p>
-                <p className="text-xs text-gray-500 truncate">{p.programName ?? "Gepland"}</p>
+                <p className={`text-xs truncate ${!p.done && selected < today ? "text-red-500 font-medium" : "text-gray-500"}`}>
+                  {!p.done && selected < today ? "Gemist" : p.programName ?? "Gepland"}
+                </p>
               </div>
-              {!p.done &&
+              {!p.done && selected < today && (
+                <Button variant="secondary" className="!px-3 !py-1.5 text-xs" onClick={() => moveToToday(p.id)}>
+                  Naar vandaag
+                </Button>
+              )}
+              {!p.done && selected >= today &&
                 (p.programDayId ? (
                   <Button className="!px-3 !py-1.5 text-xs" onClick={() => startPlanned(p.id)} disabled={busy}>
                     Start
@@ -255,6 +311,16 @@ export default function Agenda() {
               )}
             </select>
             {!choice && <Input placeholder="Titel, bv. Cardio of Rustdag" value={customTitle} onChange={(e) => setCustomTitle(e.target.value)} />}
+            <select
+              className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-bg-raised text-gray-800"
+              value={repeatWeeks}
+              onChange={(e) => setRepeatWeeks(Number(e.target.value))}
+            >
+              <option value={1}>Eenmalig</option>
+              <option value={4}>Elke week, 4 weken</option>
+              <option value={8}>Elke week, 8 weken</option>
+              <option value={12}>Elke week, 12 weken</option>
+            </select>
             <div className="flex gap-2">
               <Button className="flex-1" onClick={addPlan} disabled={busy || (!choice && !customTitle.trim())}>
                 Plan in
@@ -270,6 +336,65 @@ export default function Agenda() {
           </Button>
         )}
       </Card>
+
+      {planning ? (
+        <Card className="space-y-3">
+          <h2 className="font-display font-bold text-lg">Meerdere weken inplannen</h2>
+          <select
+            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-bg-raised text-gray-800"
+            value={weekProgram}
+            onChange={(e) => setWeekProgram(e.target.value)}
+          >
+            {programs?.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.days.length} dagen)
+              </option>
+            ))}
+          </select>
+          <div>
+            <p className="text-xs font-medium text-gray-500 mb-1.5">Op welke dagen train je?</p>
+            <div className="grid grid-cols-7 gap-1">
+              {WEEKDAYS.map((w, i) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setWeekdays((cur) => (cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i]))}
+                  className={`py-2 rounded-lg text-xs font-semibold border ${
+                    weekdays.includes(i) ? "bg-gray-900 text-white border-gray-900" : "bg-surface text-gray-600 border-gray-200"
+                  }`}
+                >
+                  {w}
+                </button>
+              ))}
+            </div>
+          </div>
+          <select
+            className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-bg-raised text-gray-800"
+            value={weekCount}
+            onChange={(e) => setWeekCount(Number(e.target.value))}
+          >
+            {[1, 2, 4, 8, 12].map((n) => (
+              <option key={n} value={n}>
+                {n} {n === 1 ? "week" : "weken"}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500">De trainingsdagen van je programma worden om de beurt over deze dagen verdeeld, vanaf vandaag.</p>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={planWeeks} disabled={busy || !weekProgram || weekdays.length === 0}>
+              Plan in
+            </Button>
+            <Button variant="secondary" onClick={() => setPlanning(false)}>
+              Sluiten
+            </Button>
+          </div>
+          {planMessage && <p className="text-sm text-center text-brand-600">{planMessage}</p>}
+        </Card>
+      ) : (
+        <Button variant="secondary" className="w-full" onClick={openPlanning}>
+          Meerdere weken inplannen
+        </Button>
+      )}
 
       <p className="text-xs text-gray-500 text-center">
         Liever een hele week in één keer?{" "}

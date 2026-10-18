@@ -47,13 +47,25 @@ export const WEEKLY_QUESTS: { key: keyof WeekStats; title: string; target: numbe
   { key: "prs", title: "Verbreek 1 record", target: 1 },
 ];
 
-export function questProgress(week: WeekStats) {
-  return WEEKLY_QUESTS.map((q) => ({
-    key: q.key,
-    title: q.title,
-    target: q.target,
-    progress: Math.min(week[q.key], q.target),
-    done: week[q.key] >= q.target,
-    xp: XP.quest,
-  }));
+/** Weekly quests; the training target follows the user (planned sessions or their
+ * training days per week) instead of a fixed 4. */
+export function questProgress(week: WeekStats, sessionTarget = 4) {
+  return WEEKLY_QUESTS.map((q) => {
+    const target = q.key === "sessions" ? sessionTarget : q.target;
+    return {
+      key: q.key,
+      title: q.key === "sessions" ? `Train ${target} keer` : q.title,
+      target,
+      progress: Math.min(week[q.key], target),
+      done: week[q.key] >= target,
+      xp: XP.quest,
+    };
+  });
+}
+
+/** Sessions to aim for this week: what's planned in the agenda, else the profile's training
+ * days, else 4 — kept between 2 and 7. */
+export function weeklySessionTarget(plannedThisWeek: number, profileDays: number | null | undefined): number {
+  const raw = plannedThisWeek > 0 ? plannedThisWeek : profileDays ?? 4;
+  return Math.max(2, Math.min(7, raw));
 }

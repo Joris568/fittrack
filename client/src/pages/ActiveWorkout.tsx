@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Exercise, ProgramExercise, SetLog, WithAchievements, WorkoutSession } from "../api/types.js";
 import { Button, Card, Input, Spinner } from "../components/ui.js";
+import { suggestNext, type Suggestion } from "../lib/progression.js";
 import { emitAchievements } from "../lib/achievementBus.js";
 import RestTimer from "../components/RestTimer.js";
 import { calculatePlatesPerSide } from "../lib/plates.js";
@@ -41,13 +42,23 @@ function ExerciseBlock({
   const [weight, setWeight] = useState(target?.targetWeight ? String(target.targetWeight) : "");
   const [rpe, setRpe] = useState("");
   const [lastTime, setLastTime] = useState<SetLog[] | null>(null);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [restKey, setRestKey] = useState<string | null>(null);
   const [showPlates, setShowPlates] = useState(false);
 
   useEffect(() => {
     api.get<SetLog[]>(`/workouts/exercise/${exercise.id}/history`).then((h) => {
       const filtered = h.filter((s) => s.workoutSessionId !== sessionId);
-      setLastTime(filtered.slice(0, 3));
+      // History is newest-first, so the first row's session is the previous time you trained this.
+      const lastSession = filtered.filter((s) => s.workoutSessionId === filtered[0]?.workoutSessionId).reverse();
+      setLastTime(lastSession);
+      const next = target ? suggestNext(lastSession, target.targetRepsMin, target.targetRepsMax) : null;
+      setSuggestion(next);
+      // Pre-fill the inputs so logging a set is one tap when you follow the suggestion.
+      if (next) {
+        setWeight(String(next.weight));
+        setReps(String(next.reps));
+      }
     });
   }, [exercise.id, sessionId]);
 
@@ -85,6 +96,18 @@ function ExerciseBlock({
         <p className="text-xs text-gray-400 mb-2">
           Vorige keer: {lastTime.map((s) => `${s.reps}x${s.weight}kg`).join(", ")}
         </p>
+      )}
+      {suggestion && (
+        <button
+          type="button"
+          onClick={() => {
+            setWeight(String(suggestion.weight));
+            setReps(String(suggestion.reps));
+          }}
+          className="w-full text-left text-xs rounded-lg bg-brand-50 text-brand-700 px-3 py-2 mb-2"
+        >
+          <span className="font-semibold">Suggestie: {suggestion.weight} kg × {suggestion.reps}.</span> {suggestion.text}
+        </button>
       )}
       {sets.length > 0 && (
         <div className="mb-2">

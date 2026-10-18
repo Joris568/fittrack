@@ -291,7 +291,18 @@ export interface DashboardData {
   planned: DashboardPlanned[];
   nextWorkout: { dayId: string; dayName: string; programName: string; exerciseCount: number } | null;
   progress: {
-    weight: { latest: number | null; delta: number | null; series: { date: string; value: number }[] };
+    weight: {
+      latest: number | null;
+      delta: number | null;
+      series: { date: string; value: number }[];
+      trend: { date: string; value: number }[];
+      ratePerWeek: number | null;
+      ratePct: number | null;
+      rateStatus: "op-schema" | "te-snel" | "te-langzaam" | null;
+      goal: "bulk" | "cut" | "maintain" | null;
+    };
+    muscleVolume: { group: string; sets: number }[];
+    missed: { id: string; date: string; title: string }[];
     calories: { average: number | null; series: { date: string; value: number }[] };
     sessionsPerWeek: { date: string; value: number }[];
     photos: { count: number; latest: { id: string; date: string; imageData: string }[] };

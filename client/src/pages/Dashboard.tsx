@@ -203,6 +203,11 @@ export default function Dashboard() {
     }
   }
 
+  async function moveToToday(id: string) {
+    await api.patch(`/calendar/planned/${id}`, { date: data?.today });
+    await load(data?.selected);
+  }
+
   async function startWorkout(dayId: string) {
     setStarting(true);
     try {
@@ -301,6 +306,23 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+        {isToday && p.missed.length > 0 && (
+          <div className="mb-3 rounded-lg bg-amber-50 px-3 py-2.5">
+            <p className="text-xs font-semibold text-amber-800 mb-1.5">
+              {p.missed.length === 1 ? "1 geplande training gemist" : `${p.missed.length} geplande trainingen gemist`}
+            </p>
+            {p.missed.slice(0, 2).map((m) => (
+              <div key={m.id} className="flex items-center justify-between gap-2 text-sm py-0.5">
+                <span className="truncate text-gray-700">
+                  {m.title} <span className="text-xs text-gray-400">({formatDay(m.date, data.today)})</span>
+                </span>
+                <button className="text-xs font-medium text-brand-600 shrink-0" onClick={() => moveToToday(m.id)}>
+                  Naar vandaag
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {data.workouts.length === 0 && data.planned.length === 0 && (
           isToday && data.nextWorkout ? (
             <div className="flex items-center gap-3">
@@ -345,14 +367,28 @@ export default function Dashboard() {
               {p.weight.latest != null ? p.weight.latest : "–"}
               <span className="text-sm font-medium text-gray-400"> kg</span>
             </p>
-            {p.weight.delta != null && (
+            {p.weight.ratePerWeek != null ? (
               <p className="text-xs text-gray-500">
-                {p.weight.delta > 0 ? "+" : ""}
-                {p.weight.delta} kg (30 dgn)
+                {p.weight.ratePerWeek > 0 ? "+" : ""}
+                {p.weight.ratePerWeek} kg/week
+                {p.weight.rateStatus && (
+                  <span
+                    className={`ml-1.5 font-semibold ${p.weight.rateStatus === "op-schema" ? "text-brand-600" : "text-amber-700"}`}
+                  >
+                    {p.weight.rateStatus === "op-schema" ? "op schema" : p.weight.rateStatus === "te-snel" ? "te snel" : "te traag"}
+                  </span>
+                )}
               </p>
+            ) : (
+              p.weight.delta != null && (
+                <p className="text-xs text-gray-500">
+                  {p.weight.delta > 0 ? "+" : ""}
+                  {p.weight.delta} kg (30 dgn)
+                </p>
+              )
             )}
             <div className="mt-2">
-              <Sparkline values={p.weight.series.map((s) => s.value)} />
+              <Sparkline values={(p.weight.trend.length >= 2 ? p.weight.trend : p.weight.series).map((s) => s.value)} />
             </div>
             <Link to="/settings" className="text-xs text-brand-600 font-medium">
               {p.weight.latest != null ? "Loggen" : "Gewicht loggen"}
@@ -400,6 +436,32 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      <Card>
+        <SectionTitle action={<span className="text-xs text-gray-500">laatste 7 dagen</span>}>Sets per spiergroep</SectionTitle>
+        {p.muscleVolume.length === 0 ? (
+          <p className="text-sm text-gray-400">Nog geen sets gelogd deze week.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {p.muscleVolume.map((m) => (
+              <div key={m.group}>
+                <div className="flex justify-between text-xs mb-1">
+                  <span className="text-gray-700">{m.group}</span>
+                  <span className="text-gray-500">{m.sets} sets</span>
+                </div>
+                <div className="relative h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="absolute inset-y-0 bg-brand-100" style={{ left: `${(6 / 18) * 100}%`, width: `${(6 / 18) * 100}%` }} />
+                  <div
+                    className={`absolute inset-y-0 left-0 rounded-full ${m.sets >= 6 ? "bg-brand-500" : "bg-gray-400"}`}
+                    style={{ width: `${Math.min(100, (m.sets / 18) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+            <p className="text-[11px] text-gray-400">De lichtoranje zone is 6-12 harde sets per week, genoeg voor groei zonder te veel te doen.</p>
+          </div>
+        )}
+      </Card>
 
       <Card>
         <SectionTitle

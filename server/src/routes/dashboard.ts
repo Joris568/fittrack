@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
-import { XP, levelFromXp, levelTitle, questProgress, WEEKLY_QUESTS, type WeekStats } from "../gamification/xp.js";
+import { XP, levelFromXp, levelTitle, questProgress, weeklySessionTarget, WEEKLY_QUESTS, type WeekStats } from "../gamification/xp.js";
+import { linearSlope, movingAverage } from "../lib/nutritionCalc.js";
 
 export const dashboardRouter = Router();
 
@@ -30,7 +31,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
   const requested = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayKey;
   const selectedKey = requested;
 
-  const [goal, sessions, foods, metrics, photoCount, latestPhotos, unlockedCount, program, plannedToday, profile] = await Promise.all([
+  const [goal, sessions, foods, metrics, photoCount, latestPhotos, unlockedCount, program, plannedToday, profile, weekSets, plannedWeek, recentPlanned] = await Promise.all([
     prisma.nutritionGoal.findFirst({ where: { userId }, orderBy: { effectiveFrom: "desc" } }),
     prisma.workoutSession.findMany({
       where: { userId },
@@ -70,7 +71,18 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
       orderBy: { createdAt: "asc" },
       include: { programDay: { select: { name: true, program: { select: { name: true } } } } },
     }),
-    prisma.userProfile.findUnique({ where: { userId }, select: { heightCm: true, goal: true, birthYear: true } }),
+    prisma.userProfile.findUnique({ where: { userId }, select: { heightCm: true, goal: true, birthYear: true, trainDays: true } }),
+    // sets in the last 7 days per muscle group (rolling week, in the user's timezone)
+    prisma.setLog.findMany({
+      where: { workoutSession: { userId, date: { gte: new Date(new Date(`${addDays(todayKey, -6)}T00:00:00Z`).getTime() + tz * 60_000) } } },
+      select: { exercise: { select: { muscleGroup: true } } },
+    }),
+    prisma.plannedWorkout.count({ where: { userId, date: { gte: weekStartKey(todayKey), lte: addDays(weekStartKey(todayKey), 6) } } }),
+    prisma.plannedWorkout.findMany({
+      where: { userId, date: { gte: addDays(todayKey, -14), lt: todayKey } },
+      orderBy: { date: "desc" },
+      include: { programDay: { select: { name: true } } },
+    }),
   ]);
 
   // ---- per-day aggregates ----
@@ -133,7 +145,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
   const lvl = levelFromXp(xp);
 
   const currentWeekKey = weekStartKey(todayKey);
-  const quests = questProgress(weeks.get(currentWeekKey) ?? emptyWeek());
+  const quests = questProgress(weeks.get(currentWeekKey) ?? emptyWeek(), weeklySessionTarget(plannedWeek, profile?.trainDays));
 
   // weeks in a row with >=1 workout (an empty current week doesn't break it yet)
   const trainedWeeks = new Set([...weeks.entries()].filter(([, w]) => w.sessions > 0).map(([k]) => k));
@@ -215,6 +227,34 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
     return { date, value: weeks.get(date)?.sessions ?? 0 };
   });
 
+  const muscleCounts = new Map<string, number>();
+  for (const s of weekSets) muscleCounts.set(s.exercise.muscleGroup, (muscleCounts.get(s.exercise.muscleGroup) ?? 0) + 1);
+  const muscleVolume = [...muscleCounts.entries()].map(([group, sets]) => ({ group, sets })).sort((a, b) => b.sets - a.sets);
+
+  // planned workouts from the last two weeks that never happened (same "done" rules as the agenda)
+  const missed = recentPlanned
+    .filter(
+      (p) =>
+        !p.done &&
+        !(p.sessionId && sessions.some((s) => s.id === p.sessionId)) &&
+        !(p.programDayId && (sessionsByDay.get(p.date) ?? []).some((s) => s.programDayId === p.programDayId))
+    )
+    .map((p) => ({ id: p.id, date: p.date, title: p.programDay?.name ?? p.title ?? "Training" }));
+
+  // weight: smoothed line over the last 4 weeks and the weekly rate, compared with the goal
+  const lastMonth = metrics.filter((m) => m.date.getTime() >= Date.now() - 28 * 86_400_000);
+  const smoothed = movingAverage(lastMonth.map((m) => m.weightKg), 7);
+  const slopePerDay =
+    lastMonth.length >= 3 ? linearSlope(lastMonth.map((m) => ({ x: m.date.getTime() / 86_400_000, y: m.weightKg }))) : null;
+  const ratePerWeek = slopePerDay === null ? null : Math.round(slopePerDay * 7 * 100) / 100;
+  const latestKg = metrics.length ? metrics[metrics.length - 1].weightKg : null;
+  const ratePct = ratePerWeek !== null && latestKg ? (ratePerWeek / latestKg) * 100 : null;
+  let rateStatus: "op-schema" | "te-snel" | "te-langzaam" | null = null;
+  if (ratePct !== null && profile?.goal) {
+    const [lo, hi] = profile.goal === "bulk" ? [0.2, 0.5] : profile.goal === "cut" ? [-1, -0.4] : [-0.2, 0.2];
+    rateStatus = ratePct < lo ? (profile.goal === "cut" ? "te-snel" : "te-langzaam") : ratePct > hi ? (profile.goal === "cut" ? "te-langzaam" : "te-snel") : "op-schema";
+  }
+
   res.json({
     today: todayKey,
     selected: selectedKey,
@@ -235,7 +275,18 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
     planned: selectedPlanned,
     nextWorkout,
     progress: {
-      weight: { latest: metrics.length ? metrics[metrics.length - 1].weightKg : null, delta: weightDelta, series: weightSeries },
+      weight: {
+        latest: latestKg,
+        delta: weightDelta,
+        series: weightSeries,
+        trend: smoothed.map((v, i) => ({ date: dayKeyOf(lastMonth[i].date), value: Math.round(v * 10) / 10 })),
+        ratePerWeek,
+        ratePct: ratePct === null ? null : Math.round(ratePct * 100) / 100,
+        rateStatus,
+        goal: profile?.goal ?? null,
+      },
+      muscleVolume,
+      missed,
       calories: { average: avgCalories, series: calorieSeries },
       sessionsPerWeek,
       photos: { count: photoCount, latest: latestPhotos },
