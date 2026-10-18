@@ -13,7 +13,7 @@ interface OffProduct {
   nutriments?: Record<string, number>;
 }
 
-function mapOffProduct(p: OffProduct) {
+export function mapOffProduct(p: OffProduct) {
   return {
     barcode: p.code ?? null,
     name: p.product_name!,
@@ -90,28 +90,30 @@ foodRouter.delete("/favorites/:foodItemId", async (req: AuthedRequest, res) => {
   res.json({ ok: true });
 });
 
+/** Searches Open Food Facts by name; only returns products with usable calorie data. */
+export async function searchOpenFoodFacts(q: string, pageSize = 20, timeoutMs = 10_000) {
+  const url = new URL("https://world.openfoodfacts.org/cgi/search.pl");
+  url.searchParams.set("search_terms", q);
+  url.searchParams.set("search_simple", "1");
+  url.searchParams.set("action", "process");
+  url.searchParams.set("json", "1");
+  url.searchParams.set("page_size", String(pageSize));
+  url.searchParams.set("fields", "code,product_name,brands,nutriments");
+  const response = await fetch(url, {
+    headers: { "User-Agent": "FitTrack-PersonalApp/1.0" },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const data = (await response.json()) as { products?: OffProduct[] };
+  return (data.products ?? [])
+    .filter((p) => p.product_name && p.nutriments?.["energy-kcal_100g"] != null)
+    .map(mapOffProduct);
+}
+
 foodRouter.get("/search", async (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   if (!q) return res.json([]);
   try {
-    const url = new URL("https://world.openfoodfacts.org/cgi/search.pl");
-    url.searchParams.set("search_terms", q);
-    url.searchParams.set("search_simple", "1");
-    url.searchParams.set("action", "process");
-    url.searchParams.set("json", "1");
-    url.searchParams.set("page_size", "20");
-    url.searchParams.set(
-      "fields",
-      "code,product_name,brands,nutriments"
-    );
-    const response = await fetch(url, {
-      headers: { "User-Agent": "FitTrack-PersonalApp/1.0" },
-    });
-    const data = (await response.json()) as { products?: OffProduct[] };
-    const results = (data.products ?? [])
-      .filter((p) => p.product_name && p.nutriments?.["energy-kcal_100g"] != null)
-      .map(mapOffProduct);
-    res.json(results);
+    res.json(await searchOpenFoodFacts(q));
   } catch (err) {
     console.error("OpenFoodFacts search failed", err);
     res.status(502).json({ error: "Voedseldatabase niet bereikbaar" });
@@ -144,6 +146,7 @@ const logEntrySchema = z.object({
   foodItemId: z.string().optional(),
   foodItem: z
     .object({
+      source: z.enum(["openfoodfacts", "custom", "estimate"]).optional(),
       barcode: z.string().nullable().optional(),
       name: z.string(),
       brand: z.string().nullable().optional(),

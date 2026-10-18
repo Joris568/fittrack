@@ -28,6 +28,16 @@ export async function callClaude(params: {
   return textBlock && textBlock.type === "text" ? textBlock.text : "";
 }
 
+function toImageBlock(url: string): Anthropic.ImageBlockParam {
+  const match = url.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) throw new Error("Ongeldige afbeelding: verwacht een base64 data-URL.");
+  const [, mediaType, base64Data] = match;
+  return {
+    type: "image",
+    source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64Data },
+  };
+}
+
 /** Sends one or more images (as data URLs, e.g. from ProgressPhoto.imageData) to Claude
  * for visual analysis alongside a text prompt. Used for physique-photo analysis — kept
  * as a separate one-off call rather than threading images through the main chat
@@ -35,23 +45,13 @@ export async function callClaude(params: {
  * side/back shots uploaded together) let Claude reason about the physique as a whole
  * instead of guessing from a single angle. */
 export async function analyzeImages(params: { imageDataUrls: string[]; prompt: string; maxTokens?: number }): Promise<string> {
-  const imageBlocks: Anthropic.ImageBlockParam[] = params.imageDataUrls.map((url) => {
-    const match = url.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-    if (!match) throw new Error("Ongeldige afbeelding: verwacht een base64 data-URL.");
-    const [, mediaType, base64Data] = match;
-    return {
-      type: "image",
-      source: { type: "base64", media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp", data: base64Data },
-    };
-  });
-
   const response = await getClient().messages.create({
     model: env.anthropicModel,
     max_tokens: params.maxTokens ?? 1024,
     messages: [
       {
         role: "user",
-        content: [...imageBlocks, { type: "text", text: params.prompt }],
+        content: [...params.imageDataUrls.map(toImageBlock), { type: "text", text: params.prompt }],
       },
     ],
   });
@@ -67,12 +67,20 @@ export async function callClaudeJson<T>(params: {
   toolDescription: string;
   inputSchema: Record<string, unknown>;
   maxTokens?: number;
+  /** Optional images attached to the last user message (vision input). */
+  imageDataUrls?: string[];
 }): Promise<T> {
+  const lastIndex = params.messages.length - 1;
+  const messages: Anthropic.MessageParam[] = params.messages.map((m, i) =>
+    params.imageDataUrls?.length && i === lastIndex && m.role === "user"
+      ? { role: "user", content: [...params.imageDataUrls.map(toImageBlock), { type: "text", text: m.content }] }
+      : m
+  );
   const response = await getClient().messages.create({
     model: env.anthropicModel,
     max_tokens: params.maxTokens ?? 2048,
     system: params.system,
-    messages: params.messages,
+    messages,
     tools: [
       {
         name: params.toolName,

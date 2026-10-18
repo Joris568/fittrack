@@ -23,6 +23,7 @@ import { recipeParserRouter } from "./routes/ai/recipeParser.js";
 import { goalProposalRouter } from "./routes/ai/goalProposal.js";
 import { programParserRouter } from "./routes/ai/programParser.js";
 import { progressPhotosRouter } from "./routes/progressPhotos.js";
+import { mealPhotoRouter } from "./routes/ai/mealPhoto.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -50,6 +51,7 @@ app.use("/api/ai/weekly-report", requireAuth, weeklyReportRouter);
 app.use("/api/ai/recipe", requireAuth, recipeParserRouter);
 app.use("/api/ai/goal-proposal", requireAuth, goalProposalRouter);
 app.use("/api/ai/program", requireAuth, programParserRouter);
+app.use("/api/ai/meal-photo", requireAuth, mealPhotoRouter);
 
 // Serve the built client in production.
 const clientDist = path.join(__dirname, "../../client/dist");

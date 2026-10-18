@@ -258,3 +258,16 @@ export interface GoalProposalContent {
     fatGrams: number;
   };
 }
+
+export interface MealPhotoItem {
+  name: string;
+  estimatedGrams: number;
+  source: "openfoodfacts" | "estimate";
+  food: FoodSearchResult & { source?: "openfoodfacts" | "estimate" };
+}
+
+export interface MealPhotoAnalysis {
+  dishName: string;
+  notes: string | null;
+  items: MealPhotoItem[];
+}

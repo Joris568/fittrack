@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { api } from "../api/client.js";
@@ -7,6 +7,7 @@ import {
   FoodItem,
   FoodLogEntry,
   FoodSearchResult,
+  MealPhotoAnalysis,
   NutritionDaySummary,
   NutritionGoal,
   RecentFood,
@@ -15,6 +16,8 @@ import {
 import { Button, Card, Input, Spinner, PageTitle } from "../components/ui.js";
 import { emitAchievements } from "../lib/achievementBus.js";
 import BarcodeScanner from "../components/BarcodeScanner.js";
+import MealPhotoReview from "../components/MealPhotoReview.js";
+import { resizeImageToDataUrl } from "../lib/image.js";
 
 const MEAL_TYPES: { key: FoodLogEntry["mealType"]; label: string }[] = [
   { key: "breakfast", label: "Ontbijt" },
@@ -89,6 +92,25 @@ function AddFoodPanel({
   const [searchError, setSearchError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<FavoriteFood[]>([]);
   const [recent, setRecent] = useState<RecentFood[]>([]);
+  const [analyzingPhoto, setAnalyzingPhoto] = useState(false);
+  const [photoAnalysis, setPhotoAnalysis] = useState<MealPhotoAnalysis | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleMealPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAnalyzingPhoto(true);
+    setSearchError(null);
+    try {
+      const imageData = await resizeImageToDataUrl(file);
+      setPhotoAnalysis(await api.post<MealPhotoAnalysis>("/ai/meal-photo/analyze", { imageData }));
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : "Foto analyseren mislukt");
+    } finally {
+      setAnalyzingPhoto(false);
+    }
+  }
 
   useEffect(() => {
     api.get<FavoriteFood[]>("/food/favorites").then(setFavorites);
@@ -188,7 +210,15 @@ function AddFoodPanel({
         <BarcodeScanner onDetected={handleBarcodeDetected} onClose={() => setScanning(false)} />
       )}
 
-      {manual ? (
+      {photoAnalysis ? (
+        <MealPhotoReview
+          analysis={photoAnalysis}
+          mealType={mealType}
+          date={date}
+          onAdded={onAdded}
+          onCancel={() => setPhotoAnalysis(null)}
+        />
+      ) : manual ? (
         <div className="space-y-2">
           <Input
             placeholder="Naam"
@@ -281,6 +311,15 @@ function AddFoodPanel({
               📷 Scan
             </Button>
           </div>
+          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handleMealPhoto} />
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={analyzingPhoto}
+          >
+            {analyzingPhoto ? "Maaltijd analyseren..." : "📸 Foto van je maaltijd"}
+          </Button>
           {searching && <p className="text-xs text-gray-400">Zoeken...</p>}
           {searchError && <p className="text-xs text-red-500">{searchError}</p>}
 
