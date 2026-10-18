@@ -18,8 +18,10 @@ export const env = {
   databaseUrl: required("DATABASE_URL"),
   appPassword: required("APP_PASSWORD"),
   jwtSecret: required("JWT_SECRET"),
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
-  anthropicModel: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5",
+  // Strip whitespace/newlines/quotes that sneak in when a key is pasted into a dashboard —
+  // an invalid character in the header makes every request fail with "Connection error".
+  anthropicApiKey: (process.env.ANTHROPIC_API_KEY ?? "").replace(/[\s"']/g, ""),
+  anthropicModel: (process.env.ANTHROPIC_MODEL ?? "").trim() || "claude-sonnet-5",
   userEmail: process.env.APP_USER_EMAIL ?? "me@fittrack.local",
   nodeEnv: process.env.NODE_ENV ?? "development",
 };
