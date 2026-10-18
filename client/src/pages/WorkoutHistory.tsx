@@ -48,16 +48,16 @@ function ProgressChart() {
       {selected && chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#232937" />
-            <XAxis dataKey="date" fontSize={11} tick={{ fill: "#8890A3" }} />
-            <YAxis fontSize={11} width={30} tick={{ fill: "#8890A3" }} />
-            <Tooltip contentStyle={{ background: "#151A22", border: "1px solid #2A3140", color: "#F4F5F9" }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="#E2DED5" />
+            <XAxis dataKey="date" fontSize={11} tick={{ fill: "#7C776C" }} />
+            <YAxis fontSize={11} width={30} tick={{ fill: "#7C776C" }} />
+            <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E2DED5", color: "#161512", borderRadius: 8 }} />
             <Line
               type="monotone"
               dataKey="weight"
-              stroke="#3FDE84"
+              stroke="#E5481A"
               strokeWidth={2}
-              dot={{ r: 3, fill: "#3FDE84" }}
+              dot={{ r: 3, fill: "#E5481A" }}
               isAnimationActive={false}
             />
           </LineChart>
@@ -129,7 +129,7 @@ export default function WorkoutHistory() {
               {session.setLogs.map((s) => (
                 <p key={s.id} className="text-sm text-gray-600">
                   {s.exercise.name}: {s.reps}x{s.weight}kg{s.rpe ? ` @RPE${s.rpe}` : ""}
-                  {s.isPR && <span className="ml-1.5 text-amber-600 font-semibold">🏆 PR</span>}
+                  {s.isPR && <span className="ml-1.5 text-[10px] font-bold tracking-wide text-brand-600 bg-brand-50 rounded px-1.5 py-0.5">PR</span>}
                 </p>
               ))}
             </div>

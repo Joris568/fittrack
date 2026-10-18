@@ -1,7 +1,7 @@
 import React from "react";
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`bg-surface rounded-2xl shadow-card p-4 ${className}`}>{children}</div>;
+  return <div className={`bg-surface rounded-xl border border-gray-100 shadow-card p-4 ${className}`}>{children}</div>;
 }
 
 export function Button({
@@ -11,14 +11,14 @@ export function Button({
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
   const styles = {
-    primary: "bg-brand-500 text-bg font-semibold shadow-glow active:bg-brand-700 disabled:opacity-40 disabled:shadow-none",
-    secondary: "bg-gray-100 text-gray-800 active:bg-gray-200",
+    primary: "bg-gray-900 text-white font-semibold active:bg-gray-700 disabled:opacity-40",
+    secondary: "bg-gray-100 text-gray-800 border border-gray-200 active:bg-gray-200",
     danger: "bg-red-50 text-red-600 active:bg-red-100",
-    ghost: "bg-transparent text-brand-400 active:text-brand-300",
+    ghost: "bg-transparent text-brand-600 active:text-brand-700",
   }[variant];
   return (
     <button
-      className={`px-4 py-2.5 rounded-xl font-medium text-sm transition-all active:scale-[0.97] ${styles} ${className}`}
+      className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all active:scale-[0.97] ${styles} ${className}`}
       {...rest}
     >
       {children}
@@ -30,7 +30,7 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-bg-raised text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none ${props.className ?? ""}`}
+      className={`w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-bg-raised text-gray-800 placeholder:text-gray-400 focus:border-gray-900 focus:outline-none ${props.className ?? ""}`}
     />
   );
 }
@@ -48,5 +48,5 @@ export function EmptyState({ children }: { children: React.ReactNode }) {
 }
 
 export function PageTitle({ children }: { children: React.ReactNode }) {
-  return <h1 className="text-xl font-bold text-gray-900 mb-4">{children}</h1>;
+  return <h1 className="font-display text-2xl font-bold tracking-tight text-gray-900 mb-4">{children}</h1>;
 }

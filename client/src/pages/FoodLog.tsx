@@ -59,11 +59,11 @@ function NutritionTrendChart({ goal }: { goal: NutritionGoal | null }) {
       <h2 className="font-semibold mb-2">Calorieën (laatste 14 dagen)</h2>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={chartData}>
-          <XAxis dataKey="date" fontSize={10} interval={1} tick={{ fill: "#8890A3" }} />
-          <YAxis fontSize={10} width={30} tick={{ fill: "#8890A3" }} />
-          <Tooltip contentStyle={{ background: "#151A22", border: "1px solid #2A3140", color: "#F4F5F9" }} />
-          {goal && <ReferenceLine y={goal.calories} stroke="#3A4254" strokeDasharray="4 4" />}
-          <Bar dataKey="kcal" fill="#3FDE84" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <XAxis dataKey="date" fontSize={10} interval={1} tick={{ fill: "#7C776C" }} />
+          <YAxis fontSize={10} width={30} tick={{ fill: "#7C776C" }} />
+          <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E2DED5", color: "#161512", borderRadius: 8 }} />
+          {goal && <ReferenceLine y={goal.calories} stroke="#CFCAC0" strokeDasharray="4 4" />}
+          <Bar dataKey="kcal" fill="#E5481A" radius={[4, 4, 0, 0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </Card>
@@ -308,7 +308,7 @@ function AddFoodPanel({
               className="flex-1"
             />
             <Button variant="secondary" className="!px-3 shrink-0" onClick={() => setScanning(true)}>
-              📷 Scan
+              Scan
             </Button>
           </div>
           <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handleMealPhoto} />
@@ -318,7 +318,7 @@ function AddFoodPanel({
             onClick={() => photoInputRef.current?.click()}
             disabled={analyzingPhoto}
           >
-            {analyzingPhoto ? "Maaltijd analyseren..." : "📸 Foto van je maaltijd"}
+            {analyzingPhoto ? "Maaltijd analyseren..." : "Foto van je maaltijd"}
           </Button>
           {searching && <p className="text-xs text-gray-400">Zoeken...</p>}
           {searchError && <p className="text-xs text-red-500">{searchError}</p>}

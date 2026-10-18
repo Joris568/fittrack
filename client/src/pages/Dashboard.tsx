@@ -93,21 +93,18 @@ export default function Dashboard() {
         <Card>
           <div className="flex justify-around text-center">
             <div>
-              <p className="text-2xl leading-none">🔥</p>
-              <p className="font-bold text-lg mt-1">{gamification.streakWeeks}</p>
-              <p className="text-xs text-gray-400">{gamification.streakWeeks === 1 ? "week op rij" : "weken op rij"}</p>
+              <p className="font-display font-bold text-3xl tracking-tight">{gamification.streakWeeks}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{gamification.streakWeeks === 1 ? "week op rij" : "weken op rij"}</p>
             </div>
             <div>
-              <p className="text-2xl leading-none">🏆</p>
-              <p className="font-bold text-lg mt-1">{gamification.totalPRs}</p>
-              <p className="text-xs text-gray-400">PR&apos;s</p>
+              <p className="font-display font-bold text-3xl tracking-tight">{gamification.totalPRs}</p>
+              <p className="text-xs text-gray-500 mt-0.5">PR&apos;s</p>
             </div>
             <div>
-              <p className="text-2xl leading-none">🎖️</p>
-              <p className="font-bold text-lg mt-1">
+              <p className="font-display font-bold text-3xl tracking-tight">
                 {gamification.achievements.filter((a) => a.unlocked).length}/{gamification.achievements.length}
               </p>
-              <p className="text-xs text-gray-400">badges</p>
+              <p className="text-xs text-gray-500 mt-0.5">badges</p>
             </div>
           </div>
           <Link to="/settings" className="block mt-3 text-center text-sm text-brand-600 font-medium">
@@ -186,7 +183,7 @@ export default function Dashboard() {
         )}
       </Card>
 
-      <Link to="/train">
+      <Link to="/train" className="block">
         <Button className="w-full">Start training</Button>
       </Link>
     </div>

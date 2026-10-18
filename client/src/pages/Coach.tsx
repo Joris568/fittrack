@@ -109,7 +109,7 @@ export default function Coach() {
         ...dataUrls.map((dataUrl, i) => ({
           id: `tmp-${Date.now()}-${i}`,
           role: "user" as const,
-          content: i === 0 ? caption || (dataUrls.length > 1 ? `📷 ${dataUrls.length} nieuwe voortgangsfoto's` : "📷 Nieuwe voortgangsfoto") : "",
+          content: i === 0 ? caption || (dataUrls.length > 1 ? `${dataUrls.length} nieuwe voortgangsfoto's` : "Nieuwe voortgangsfoto") : "",
           createdAt: new Date().toISOString(),
           imagePreview: dataUrl,
         })),
@@ -169,7 +169,7 @@ export default function Coach() {
           <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm whitespace-pre-line ${
-                m.role === "user" ? "bg-brand-500 text-bg font-medium" : "bg-surface shadow-sm text-gray-800"
+                m.role === "user" ? "bg-gray-900 text-white" : "bg-surface border border-gray-100 shadow-sm text-gray-800"
               }`}
             >
               {m.imagePreview && (
@@ -202,10 +202,13 @@ export default function Coach() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={sending}
-          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-xl bg-surface text-gray-400 text-lg disabled:opacity-40"
+          className="shrink-0 w-11 h-11 flex items-center justify-center rounded-lg bg-surface border border-gray-200 text-gray-600 text-lg disabled:opacity-40"
           aria-label="Foto toevoegen"
         >
-          📷
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
         </button>
         <Input
           placeholder="Vraag iets aan je coach..."

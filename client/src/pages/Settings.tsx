@@ -103,7 +103,7 @@ export default function SettingsPage() {
                 className={`rounded-xl px-3 py-2.5 ${a.unlocked ? "bg-brand-50" : "bg-gray-50 opacity-50"}`}
               >
                 <p className={`text-sm font-medium ${a.unlocked ? "text-brand-700" : "text-gray-500"}`}>
-                  {a.unlocked ? "🏅" : "🔒"} {a.title}
+                  {a.title}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">{a.description}</p>
               </div>
@@ -185,21 +185,21 @@ export default function SettingsPage() {
         {weightChartData.length > 1 && (
           <ResponsiveContainer width="100%" height={160} className="mt-3">
             <LineChart data={weightChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#232937" />
-              <XAxis dataKey="date" fontSize={10} tick={{ fill: "#8890A3" }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2DED5" />
+              <XAxis dataKey="date" fontSize={10} tick={{ fill: "#7C776C" }} />
               <YAxis
                 fontSize={10}
                 width={35}
                 domain={["dataMin - 1", "dataMax + 1"]}
-                tick={{ fill: "#8890A3" }}
+                tick={{ fill: "#7C776C" }}
               />
-              <Tooltip contentStyle={{ background: "#151A22", border: "1px solid #2A3140", color: "#F4F5F9" }} />
+              <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid #E2DED5", color: "#161512", borderRadius: 8 }} />
               <Line
                 type="monotone"
                 dataKey="weight"
-                stroke="#3FDE84"
+                stroke="#E5481A"
                 strokeWidth={2}
-                dot={{ r: 2, fill: "#3FDE84" }}
+                dot={{ r: 2, fill: "#E5481A" }}
                 isAnimationActive={false}
               />
             </LineChart>

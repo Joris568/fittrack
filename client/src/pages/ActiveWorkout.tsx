@@ -15,7 +15,7 @@ function SetRow({ set, onDelete }: { set: SetLog; onDelete: () => void }) {
       <span>
         Set {set.setNumber}: <strong>{set.reps}</strong> reps @ <strong>{set.weight}</strong>kg
         {set.rpe ? ` (RPE ${set.rpe})` : ""}
-        {set.isPR && <span className="ml-1.5 text-amber-600 font-semibold">🏆 PR</span>}
+        {set.isPR && <span className="ml-1.5 text-[10px] font-bold tracking-wide text-brand-600 bg-brand-50 rounded px-1.5 py-0.5">PR</span>}
       </span>
       <button className="text-gray-300 text-xs" onClick={onDelete}>
         ✕
@@ -129,7 +129,7 @@ function ExerciseBlock({
           className="text-xs text-gray-400 mt-1.5"
           onClick={() => setShowPlates((v) => !v)}
         >
-          🏋️ platen per kant {showPlates ? "▲" : "▼"}
+          Platen per kant {showPlates ? "▲" : "▼"}
         </button>
       )}
       {showPlates && weight && (

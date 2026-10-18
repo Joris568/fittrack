@@ -29,8 +29,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-6 bg-bg">
       <Card className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="text-4xl mb-2">💪</div>
-          <h1 className="text-xl font-bold">FitTrack</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">FitTrack</h1>
           <p className="text-gray-400 text-sm">Jouw persoonlijke training & voeding</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-3">

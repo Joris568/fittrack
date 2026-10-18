@@ -4,64 +4,39 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Manrope", "system-ui", "-apple-system", "sans-serif"],
+        sans: ["DM Sans", "system-ui", "-apple-system", "sans-serif"],
+        display: ["Bricolage Grotesque", "DM Sans", "system-ui", "sans-serif"],
       },
       colors: {
-        // Page background is near-black; `surface` is the raised-card color a
-        // couple steps lighter, giving cards visible depth without a hard border.
+        // Warm paper background, white cards, ink text, one orange accent.
         bg: {
-          DEFAULT: "#0A0D12",
-          raised: "#10141B",
+          DEFAULT: "#F5F3EE",
+          raised: "#FBFAF7",
         },
         surface: {
-          DEFAULT: "#151A22",
-          hover: "#1B212C",
+          DEFAULT: "#FFFFFF",
+          hover: "#FAF8F4",
         },
-        // `gray` keeps its usual light->dark NUMBER order but the actual
-        // lightness is flipped for a dark theme: gray-50 is a subtle dark
-        // surface tint, gray-900 is near-white text. Every existing
-        // bg-gray-50 / text-gray-400 / border-gray-200 class repaints for
-        // free without touching each page.
         gray: {
-          50: "#171C25",
-          100: "#1F2530",
-          200: "#2A3140",
-          300: "#3A4254",
-          400: "#727D93",
-          500: "#8890A3",
-          600: "#AAB1C2",
-          700: "#C7CCD9",
-          800: "#E4E7EE",
-          900: "#F4F5F9",
+          50: "#F8F6F1", 100: "#EFECE5", 200: "#E2DED5", 300: "#CFCAC0",
+          400: "#8F8A7F", 500: "#7C776C", 600: "#5D594F", 700: "#403D35",
+          800: "#26241F", 900: "#161512",
         },
         brand: {
-          50: "#0F2A1C",
-          100: "#153A26",
-          200: "#1E5236",
-          300: "#227A45",
-          400: "#3FDE84",
-          500: "#2ECC71",
-          600: "#3FDE84",
-          700: "#26A85E",
+          50: "#FFF1EA", 100: "#FFE0D1", 200: "#FFC2A6", 300: "#FF9A6E",
+          400: "#FF7A45", 500: "#E5481A", 600: "#C23F0C", 700: "#A33309",
         },
         amber: {
-          50: "#2E2410",
-          100: "#3D3016",
-          200: "#5C4A1F",
-          600: "#F2B83D",
-          700: "#F5C563",
-          800: "#F9D998",
+          50: "#FFF7E0", 100: "#FFEDB8", 200: "#FFDD85",
+          600: "#A8650A", 700: "#8A5208", 800: "#6B3F06",
         },
         red: {
-          50: "#2E1616",
-          100: "#3D1D1D",
-          500: "#F0685E",
-          600: "#F5847B",
+          50: "#FDECEA", 100: "#FADAD6", 500: "#D93A2B", 600: "#C0301F",
         },
       },
       boxShadow: {
-        card: "0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -12px rgba(0,0,0,0.5)",
-        glow: "0 0 0 1px rgba(63,222,132,0.15), 0 4px 16px -4px rgba(63,222,132,0.35)",
+        card: "0 1px 2px rgba(22,21,18,0.04), 0 6px 20px -10px rgba(22,21,18,0.12)",
+        glow: "none",
       },
     },
   },

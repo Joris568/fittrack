@@ -85,7 +85,7 @@ export default function MealPhotoReview({
                 type="checkbox"
                 checked={r.include}
                 onChange={(e) => setRows((prev) => prev.map((x, j) => (j === i ? { ...x, include: e.target.checked } : x)))}
-                className="w-5 h-5 shrink-0 accent-[#2ECC71]"
+                className="w-5 h-5 shrink-0 accent-[#E5481A]"
               />
               <div className="flex-1 min-w-0">
                 <p className="text-sm truncate">{r.item.name}</p>

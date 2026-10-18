@@ -194,7 +194,7 @@ export default function ProgramsList() {
             + Nieuw programma
           </Button>
           <Button variant="secondary" className="flex-1" onClick={() => setImporting(true)}>
-            📋 Programma plakken
+            Programma plakken
           </Button>
         </div>
       )}

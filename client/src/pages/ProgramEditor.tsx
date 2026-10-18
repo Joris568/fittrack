@@ -175,7 +175,7 @@ function PlateauBanner({ program }: { program: WorkoutProgram }) {
 
   return (
     <Card className="border-2 border-amber-200 bg-amber-50">
-      <p className="text-sm font-medium text-amber-800 mb-1">⚠️ Stilstand gedetecteerd</p>
+      <p className="text-sm font-medium text-amber-800 mb-1">Stilstand gedetecteerd</p>
       {relevant.map((p) => (
         <p key={p.programExerciseId} className="text-xs text-amber-700">
           {p.exerciseName}: geen vooruitgang in {p.sessionsFlat} sessies ({p.weights.join("kg → ")}kg)
