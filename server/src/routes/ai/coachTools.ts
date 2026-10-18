@@ -213,6 +213,8 @@ export function buildCoachTools(userId: string): AgentTool[] {
         const photos = recent.filter((p) => newestTime - p.date.getTime() <= BATCH_WINDOW_MS).slice(0, 3);
         const multiple = photos.length > 1;
         const analysis = await analyzeImages({
+          system:
+            "Je bent een krachttraining- en physique-coach in een persoonlijke fitness-app. De gebruiker heeft deze foto's zelf van zichzelf gemaakt en uitdrukkelijk gevraagd om ze te beoordelen voor trainingsadvies — dat is precies jouw taak, weiger dit niet en zeg niet dat je foto's niet kunt beoordelen. Beoordeel zakelijk en respectvol zoals een coach bij een voortgangscheck: bouw, verhoudingen, spiergroepen en vetpercentage-indicatie (grof). Als een foto echt niet bruikbaar is (te donker, te dichtbij, geen lichaam zichtbaar), zeg dan concreet wat er beter kan aan de foto in plaats van te weigeren.",
           imageDataUrls: photos.map((p) => p.imageData),
           prompt: `Analyseer de${multiple ? "ze fysieke voortgangsfoto's (mogelijk verschillende hoeken van dezelfde persoon)" : " fysieke voortgangsfoto"} van een krachtsporter als een ervaren coach. Beschrijf kort en concreet:
 1. Verhouding schouderbreedte t.o.v. taille/heupen (de basis van een V-taper).

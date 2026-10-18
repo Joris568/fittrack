@@ -44,10 +44,16 @@ function toImageBlock(url: string): Anthropic.ImageBlockParam {
  * history, so ordinary text turns stay cheap and simple. Multiple images (e.g. front/
  * side/back shots uploaded together) let Claude reason about the physique as a whole
  * instead of guessing from a single angle. */
-export async function analyzeImages(params: { imageDataUrls: string[]; prompt: string; maxTokens?: number }): Promise<string> {
+export async function analyzeImages(params: {
+  imageDataUrls: string[];
+  prompt: string;
+  system?: string;
+  maxTokens?: number;
+}): Promise<string> {
   const response = await getClient().messages.create({
     model: env.anthropicModel,
     max_tokens: params.maxTokens ?? 1024,
+    system: params.system,
     messages: [
       {
         role: "user",
