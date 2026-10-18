@@ -65,7 +65,7 @@ export async function buildUserContext(userId: string): Promise<string> {
     lines.push(`Totaal aantal sessies: ${sessions.length}`);
   }
 
-  // Weekly volume per muscle group (last 7 days) — directly comparable to the 10-20 sets/week guideline.
+  // Weekly volume per muscle group (last 7 days) — directly comparable to the ~6-12 hard sets/week guideline.
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const recentSessions = sessions.filter((s) => s.date >= sevenDaysAgo);
@@ -83,7 +83,7 @@ export async function buildUserContext(userId: string): Promise<string> {
       }
     }
     for (const [muscleGroup, sets] of setsByMuscleGroup) {
-      lines.push(`- ${muscleGroup}: ${sets} sets (richtlijn: 10-20 sets/week)`);
+      lines.push(`- ${muscleGroup}: ${sets} sets (richtlijn: ~6-12 harde sets/week, 2 per oefening)`);
     }
   }
 
