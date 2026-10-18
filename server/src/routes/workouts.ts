@@ -95,6 +95,7 @@ const setLogSchema = z.object({
   weight: z.number().min(0),
   rpe: z.number().min(1).max(10).optional(),
   notes: z.string().optional(),
+  clientId: z.string().min(8).max(64).optional(),
 });
 
 workoutsRouter.post("/:id/sets", async (req: AuthedRequest, res) => {
@@ -104,6 +105,13 @@ workoutsRouter.post("/:id/sets", async (req: AuthedRequest, res) => {
     where: { id: req.params.id, userId: req.userId },
   });
   if (!session) return res.status(404).json({ error: "Not found" });
+
+  // Retried request (e.g. flushed from the offline queue after the first attempt actually
+  // got through): hand back the set that already exists instead of logging it twice.
+  if (parsed.data.clientId) {
+    const existing = await prisma.setLog.findFirst({ where: { clientId: parsed.data.clientId, workoutSession: { userId: req.userId } }, include: { exercise: true } });
+    if (existing) return res.status(200).json({ ...existing, newAchievements: [] });
+  }
 
   // A record = a higher estimated 1RM than any earlier set (so more reps at the same
   // weight counts too, not only a heavier weight).

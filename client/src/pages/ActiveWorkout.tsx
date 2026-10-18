@@ -4,6 +4,7 @@ import { api } from "../api/client.js";
 import { Exercise, ProgramExercise, SetLog, WithAchievements, WorkoutSession } from "../api/types.js";
 import { Button, Card, Input, Spinner } from "../components/ui.js";
 import { suggestNext, type Suggestion } from "../lib/progression.js";
+import { enqueueSet, getQueuedSets, isNetworkError, subscribeQueue, type QueuedSet } from "../lib/offlineQueue.js";
 import { emitAchievements } from "../lib/achievementBus.js";
 import RestTimer from "../components/RestTimer.js";
 import { calculatePlatesPerSide } from "../lib/plates.js";
@@ -43,6 +44,7 @@ function ExerciseBlock({
   const [rpe, setRpe] = useState("");
   const [lastTime, setLastTime] = useState<SetLog[] | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
+  const [queued, setQueued] = useState<QueuedSet[]>(() => getQueuedSets(sessionId).filter((q) => q.payload.exerciseId === exercise.id));
   const [restKey, setRestKey] = useState<string | null>(null);
   const [showPlates, setShowPlates] = useState(false);
 
@@ -62,20 +64,45 @@ function ExerciseBlock({
     });
   }, [exercise.id, sessionId]);
 
+  useEffect(() => {
+    const refresh = () => setQueued(getQueuedSets(sessionId).filter((q) => q.payload.exerciseId === exercise.id));
+    const unsubscribe = subscribeQueue(refresh);
+    // queued sets just reached the server: reload the real list
+    const onSynced = () => onChange();
+    window.addEventListener("fittrack:synced", onSynced);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("fittrack:synced", onSynced);
+    };
+  }, [sessionId, exercise.id, onChange]);
+
   async function addSet(e: React.FormEvent) {
     e.preventDefault();
     if (!reps || !weight) return;
-    const result = await api.post<SetLog & WithAchievements>(`/workouts/${sessionId}/sets`, {
+    const clientId = crypto.randomUUID();
+    const payload = {
       exerciseId: exercise.id,
-      setNumber: sets.length + 1,
+      setNumber: sets.length + queued.length + 1,
       reps: Number(reps),
       weight: Number(weight),
       rpe: rpe ? Number(rpe) : undefined,
-    });
-    emitAchievements(result.newAchievements);
+    };
+    try {
+      const result = await api.post<SetLog & WithAchievements>(
+        `/workouts/${sessionId}/sets`,
+        { ...payload, clientId },
+        { signal: AbortSignal.timeout(12_000) }
+      );
+      emitAchievements(result.newAchievements);
+      setRestKey(result.id);
+      onChange();
+    } catch (err) {
+      if (!isNetworkError(err)) throw err;
+      // No (or too slow) connection: keep the set locally and sync it later.
+      enqueueSet(sessionId, payload, clientId);
+      setRestKey(clientId);
+    }
     setRpe("");
-    setRestKey(result.id);
-    onChange();
   }
 
   async function deleteSet(id: string) {
@@ -109,10 +136,18 @@ function ExerciseBlock({
           <span className="font-semibold">Suggestie: {suggestion.weight} kg × {suggestion.reps}.</span> {suggestion.text}
         </button>
       )}
-      {sets.length > 0 && (
+      {(sets.length > 0 || queued.length > 0) && (
         <div className="mb-2">
           {sets.map((s) => (
             <SetRow key={s.id} set={s} onDelete={() => deleteSet(s.id)} />
+          ))}
+          {queued.map((q, i) => (
+            <div key={q.clientId} className="flex justify-between items-center text-sm py-1.5 border-b border-gray-100 last:border-0 text-gray-500">
+              <span>
+                Set {sets.length + i + 1}: {String(q.payload.reps)} × {String(q.payload.weight)} kg
+              </span>
+              <span className="text-xs text-amber-700">wacht op verbinding</span>
+            </div>
           ))}
         </div>
       )}
@@ -143,7 +178,7 @@ function ExerciseBlock({
           className="!py-2"
         />
         <Button type="submit" className="!px-3 !py-2 shrink-0">
-          Set {sets.length + 1}
+          Set {sets.length + queued.length + 1}
         </Button>
       </form>
       {weight && Number(weight) > 20 && (

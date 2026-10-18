@@ -111,7 +111,10 @@ model SetLog {
   rpe              Float?
   notes            String?
   isPR             Boolean  @default(false)
+  clientId         String?  // set by the app so a retried (offline-queued) set is never stored twice (plain index, not unique: a unique constraint would make `prisma db push` demand --accept-data-loss on deploy)
   createdAt        DateTime @default(now())
+
+  @@index([clientId])
 }
 
 // ---------- Nutrition ----------

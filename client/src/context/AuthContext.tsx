@@ -32,6 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await api.post("/auth/logout");
+    // the service worker caches workout/program data — forget it when someone logs out
+    navigator.serviceWorker?.controller?.postMessage("clear-data");
     setAuthenticated(false);
   }, []);
 

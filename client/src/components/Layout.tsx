@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
+import { flushQueue, getQueuedSets, subscribeQueue } from "../lib/offlineQueue.js";
 import AchievementToaster from "./AchievementToaster.js";
 
 function Icon({ children }: { children: React.ReactNode }) {
@@ -81,9 +83,49 @@ const tabs = [
   },
 ];
 
+/** Keeps the app honest about connectivity: tells you when you're offline and syncs sets
+ * logged without a connection as soon as it is back. */
+function useOfflineSync() {
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [pending, setPending] = useState(() => getQueuedSets().length);
+
+  useEffect(() => {
+    const sync = () => {
+      flushQueue().then((n) => {
+        if (n > 0) window.dispatchEvent(new Event("fittrack:synced"));
+      });
+    };
+    const goOnline = () => {
+      setOnline(true);
+      sync();
+    };
+    const goOffline = () => setOnline(false);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    const unsubscribe = subscribeQueue(() => setPending(getQueuedSets().length));
+    sync();
+    const timer = setInterval(() => getQueuedSets().length > 0 && sync(), 15_000);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, []);
+
+  return { online, pending };
+}
+
 export default function Layout({ children }: { children: React.ReactNode }) {
+  const { online, pending } = useOfflineSync();
   return (
     <div className="min-h-screen flex flex-col">
+      {(!online || pending > 0) && (
+        <div className="bg-amber-100 text-amber-800 text-xs text-center px-3 py-1.5 font-medium">
+          {!online ? "Geen verbinding" : "Synchroniseren"}
+          {pending > 0 && ` — ${pending} ${pending === 1 ? "set wacht" : "sets wachten"} op verbinding`}
+        </div>
+      )}
       <AchievementToaster />
       <main className="flex-1 pb-20 max-w-2xl w-full mx-auto px-4 pt-5">{children}</main>
       <nav className="fixed bottom-0 left-0 right-0 bg-surface/95 backdrop-blur border-t border-gray-200 flex justify-around items-stretch pb-[env(safe-area-inset-bottom)] z-20">
