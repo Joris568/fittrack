@@ -29,6 +29,8 @@ model User {
   achievements  Achievement[]
   plannedWorkouts PlannedWorkout[]
   profile       UserProfile?
+  pushSubscriptions PushSubscription[]
+  reminderSettings  ReminderSettings?
 }
 
 // ---------- Training ----------
@@ -316,4 +318,36 @@ model UserProfile {
   checkinHandledAt DateTime? // when the weekly calorie check-in was last applied or dismissed
   priorityMuscles  String?   // JSON array of muscle groups the user wants to emphasise
   updatedAt   DateTime @updatedAt
+}
+
+// ---------- Push notifications ----------
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+model ReminderSettings {
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  user         User    @relation(fields: [userId], references: [id])
+  trainingOn   Boolean @default(true)
+  trainingTime String  @default("17:00")
+  weighOn      Boolean @default(true)
+  weighTime    String  @default("08:30")
+  foodOn       Boolean @default(true)
+  foodTime     String  @default("20:30")
+  weeklyOn     Boolean @default(true)
+  sentLog      String? // JSON array of "type:YYYY-MM-DD" keys already handled
+}
+
+// Small key/value store for secrets the app generates itself (the Web Push VAPID keys).
+model AppSecret {
+  key   String @id
+  value String
 }

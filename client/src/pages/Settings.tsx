@@ -6,6 +6,7 @@ import { BodyMetric, GamificationSummary, ProgressPhoto } from "../api/types.js"
 import { useAuth } from "../context/AuthContext.js";
 import { Button, Card, Input, PageTitle } from "../components/ui.js";
 import { resizeImageToDataUrl } from "../lib/image.js";
+import NotificationSettings from "../components/NotificationSettings.js";
 
 export default function SettingsPage() {
   const { logout } = useAuth();
@@ -333,6 +334,8 @@ export default function SettingsPage() {
           <span className="text-gray-400">›</span>
         </Card>
       </Link>
+
+      <NotificationSettings />
 
       {usage && (
         <Card>
