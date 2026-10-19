@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addItem, deriveLayout, moveItem, removeItem, replaceItem, serializeLayout, workingSetCounts, type LayoutItem } from "./workoutLayout.js";
+import { addItem, deriveLayout, groupIndexes, moveItem, nextInSuperset, normalizeGroups, removeItem, replaceItem, serializeLayout, toggleSuperset, workingSetCounts, type LayoutItem } from "./workoutLayout.js";
 
 const item = (id: string, sets = 2): LayoutItem => ({ exerciseId: id, targetSets: sets, repsMin: 8, repsMax: 10 });
 
@@ -43,5 +43,46 @@ describe("workout layout", () => {
   it("counts only working sets", () => {
     const m = workingSetCounts([{ exerciseId: "a", isWarmup: true }, { exerciseId: "a", isWarmup: false }, { exerciseId: "a" }]);
     expect(m.get("a")).toBe(2);
+  });
+});
+
+describe("supersets", () => {
+  const base = [item("a"), item("b"), item("c"), item("d")];
+
+  it("links an exercise with the one below and splits again", () => {
+    const linked = toggleSuperset(base, 1);
+    expect(linked[1].groupId).toBeTruthy();
+    expect(linked[1].groupId).toBe(linked[2].groupId);
+    expect(linked[0].groupId).toBeFalsy();
+    const split = toggleSuperset(linked, 1);
+    expect(split.every((i) => !i.groupId)).toBe(true);
+  });
+
+  it("extends a superset into a triple and keeps groups contiguous when something moves", () => {
+    const pair = toggleSuperset(base, 0);
+    const triple = toggleSuperset(pair, 1);
+    expect(triple.slice(0, 3).map((i) => i.groupId)).toEqual([triple[0].groupId, triple[0].groupId, triple[0].groupId]);
+    expect(groupIndexes(triple, 2)).toEqual([0, 1, 2]);
+    // moving the last member away breaks adjacency only if it leaves the run
+    const moved = moveItem(pair, 0, -1);
+    expect(moved).toBe(pair);
+    const broken = moveItem(toggleSuperset(base, 0), 1, 1); // a,[b swapped past c] -> a alone, group dissolves
+    expect(broken.every((i) => !i.groupId)).toBe(true);
+  });
+
+  it("drops a group of one (e.g. after removing a member)", () => {
+    const pair = toggleSuperset(base, 0);
+    expect(removeItem(pair, 1).every((i) => !i.groupId)).toBe(true);
+    expect(normalizeGroups([{ ...item("x"), groupId: "g" }])[0].groupId).toBeNull();
+  });
+
+  it("alternates between the members round by round", () => {
+    const pair = toggleSuperset(base, 0); // a + b
+    // A did its first set: B is behind → go to B, round not complete
+    expect(nextInSuperset(pair, 0, new Map([["a", 1]]))).toEqual({ next: 1, roundComplete: false });
+    // B caught up: round complete → back to A
+    expect(nextInSuperset(pair, 1, new Map([["a", 1], ["b", 1]]))).toEqual({ next: 0, roundComplete: true });
+    // not a superset
+    expect(nextInSuperset(base, 2, new Map())).toBeNull();
   });
 });

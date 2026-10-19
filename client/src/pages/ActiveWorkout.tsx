@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Exercise, WorkoutSession, WorkoutSummary } from "../api/types.js";
 import { Spinner } from "../components/ui.js";
+import { useWakeLock } from "../lib/wakeLock.js";
 import ExercisePicker from "../components/ExercisePicker.js";
 import ExerciseSheet from "../components/ExerciseSheet.js";
 import RestTimer from "../components/RestTimer.js";
@@ -11,9 +12,11 @@ import {
   addItem,
   deriveLayout,
   moveItem,
+  nextInSuperset,
   removeItem,
   replaceItem,
   serializeLayout,
+  toggleSuperset,
   workingSetCounts,
   type LayoutItem,
 } from "../lib/workoutLayout.js";
@@ -39,6 +42,7 @@ export default function ActiveWorkout() {
   const [toast, setToast] = useState<string | null>(null);
   const [finishing, setFinishing] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const wakeLockHeld = useWakeLock(!!session && !session.finishedAt);
   const prevCounts = useRef<Map<string, number> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -139,6 +143,8 @@ export default function ActiveWorkout() {
   const planned = layout.reduce((n, i) => n + i.targetSets, 0);
   const done = layout.reduce((n, i) => n + Math.min(counts.get(i.exerciseId) ?? 0, i.targetSets), 0);
   const pct = planned > 0 ? Math.round((done / planned) * 100) : 0;
+  const supersetLabels = new Map<string, string>();
+  for (const i of layout) if (i.groupId && !supersetLabels.has(i.groupId)) supersetLabels.set(i.groupId, String.fromCharCode(65 + supersetLabels.size));
 
   return (
     <div className="pb-40">
@@ -149,6 +155,7 @@ export default function ActiveWorkout() {
             <p className="text-xs text-gray-500">
               {elapsed < 8 * 3600_000 ? `${formatElapsed(elapsed)} · ` : ""}
               {done}/{planned} sets
+              {wakeLockHeld && <span className="text-brand-600"> · scherm blijft aan</span>}
             </p>
           </div>
           <button
@@ -195,8 +202,21 @@ export default function ActiveWorkout() {
               onReplace={() => setPicker({ mode: "replace", index })}
               onRemove={() => persist(removeItem(layout, index))}
               onInfo={() => setSheet(exercise)}
+              supersetLabel={supersetLabels.get(item.groupId ?? "") ?? null}
+              linkedWithNext={!!item.groupId && layout[index + 1]?.groupId === item.groupId}
+              onToggleSuperset={() => persist(toggleSuperset(layout, index))}
               onSetLogged={({ isPR, restSeconds, exerciseName, weight, reps }) => {
-                setRest({ key: `${Date.now()}`, seconds: restSeconds });
+                // Superset: hop to the partner exercise with (almost) no rest; full rest once the round is done.
+                const after = new Map(counts);
+                after.set(item.exerciseId, (after.get(item.exerciseId) ?? 0) + 1);
+                const hop = nextInSuperset(layout, index, after);
+                if (hop && !hop.roundComplete) {
+                  setOpenId(layout[hop.next].exerciseId);
+                  setRest({ key: `${Date.now()}`, seconds: 15 });
+                } else {
+                  setRest({ key: `${Date.now()}`, seconds: restSeconds });
+                  if (hop?.roundComplete && (after.get(item.exerciseId) ?? 0) < item.targetSets) setOpenId(layout[hop.next].exerciseId);
+                }
                 if (isPR) {
                   if (navigator.vibrate) navigator.vibrate([40, 60, 40, 60, 140]);
                   showToast(`Nieuw record: ${exerciseName} ${weight} kg × ${reps}`);

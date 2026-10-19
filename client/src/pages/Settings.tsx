@@ -23,6 +23,10 @@ export default function SettingsPage() {
     total: { calls: number; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
     byLabel: { label: string; calls: number; inputTokens: number; outputTokens: number }[];
   } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importUnit, setImportUnit] = useState<"kg" | "lbs">("kg");
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [storage, setStorage] = useState<{ photoCount: number; photoBytes: number; chatImageBytes: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -72,6 +76,27 @@ export default function SettingsPage() {
       setPhotoError(err instanceof Error ? err.message : "Uploaden mislukt");
     } finally {
       setUploadingPhoto(false);
+    }
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const csv = await file.text();
+      const r = await api.post<{ sessions: number; sets: number; newExercises: string[]; skippedRows: number; duplicateSessions: number }>("/import/workouts", { csv, unit: importUnit });
+      setImportResult(
+        `${r.sessions} trainingen en ${r.sets} sets geïmporteerd` +
+          (r.duplicateSessions ? `, ${r.duplicateSessions} stonden er al` : "") +
+          (r.newExercises.length ? `. Nieuwe oefeningen: ${r.newExercises.slice(0, 6).join(", ")}${r.newExercises.length > 6 ? "…" : ""}` : ".")
+      );
+    } catch (err) {
+      setImportResult(err instanceof Error ? err.message : "Importeren mislukt.");
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -319,6 +344,30 @@ export default function SettingsPage() {
           </div>
         </Card>
       )}
+
+      <Card>
+        <h2 className="font-semibold mb-1">Trainingen importeren</h2>
+        <p className="text-xs text-gray-500 mb-3">
+          Kom je uit Strong of Hevy? Exporteer daar je trainingen als CSV en kies het bestand hier. Je records en suggesties werken dan meteen op je oude data.
+        </p>
+        <div className="flex gap-2 mb-2">
+          {(["kg", "lbs"] as const).map((u) => (
+            <button
+              key={u}
+              type="button"
+              onClick={() => setImportUnit(u)}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold border ${importUnit === u ? "bg-gray-900 text-white border-gray-900" : "bg-surface text-gray-600 border-gray-200"}`}
+            >
+              Gewichten in {u}
+            </button>
+          ))}
+        </div>
+        <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImport} />
+        <Button variant="secondary" className="w-full" onClick={() => importInputRef.current?.click()} disabled={importing}>
+          {importing ? "Importeren..." : "Kies CSV-bestand"}
+        </Button>
+        {importResult && <p className="text-sm text-gray-700 mt-2">{importResult}</p>}
+      </Card>
 
       <Card>
         <h2 className="font-semibold mb-1">Back-up &amp; opslag</h2>

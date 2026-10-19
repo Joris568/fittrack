@@ -31,6 +31,15 @@ exercisesRouter.post("/", async (req, res) => {
   res.status(201).json(exercise);
 });
 
+/** Your own reminder for an exercise ("stoel op 4", "smalle grip", a link to a form video). */
+exercisesRouter.patch("/:id/note", async (req, res) => {
+  const parsed = z.object({ note: z.string().max(400) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Notitie is te lang (max 400 tekens)." });
+  const note = parsed.data.note.trim();
+  await prisma.exercise.update({ where: { id: req.params.id }, data: { notes: note || null } });
+  res.json({ notes: note || null });
+});
+
 exercisesRouter.delete("/:id", async (req, res) => {
   await prisma.exercise.delete({ where: { id: req.params.id } });
   res.json({ ok: true });

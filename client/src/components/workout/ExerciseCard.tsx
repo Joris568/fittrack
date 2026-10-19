@@ -9,6 +9,22 @@ import type { LayoutItem } from "../../lib/workoutLayout.js";
 import Stepper from "./Stepper.js";
 
 export const DEFAULT_REST_SECONDS = 90;
+
+function Linkified({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(https?:\/\/\S+)/g).map((part, i) =>
+        /^https?:\/\//.test(part) ? (
+          <a key={i} href={part} target="_blank" rel="noreferrer" className="underline text-brand-700 break-all">
+            {part.replace(/^https?:\/\/(www\.)?/, "").slice(0, 40)}
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
 const RPE_OPTIONS = [6, 7, 8, 9, 10];
 
 interface Props {
@@ -25,6 +41,10 @@ interface Props {
   onReplace: () => void;
   onRemove: () => void;
   onInfo: () => void;
+  /** e.g. "A" for the first superset in the training; null when not in one */
+  supersetLabel?: string | null;
+  linkedWithNext?: boolean;
+  onToggleSuperset?: () => void;
   onSetLogged: (info: { isPR: boolean; restSeconds: number; exerciseName: string; weight: number; reps: number }) => void;
 }
 
@@ -45,6 +65,9 @@ export default function ExerciseCard(p: Props) {
   const [menu, setMenu] = useState(false);
   const [showPlates, setShowPlates] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState(exercise.notes ?? "");
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
   const loaded = useRef(false);
   const prefilled = useRef(false);
 
@@ -111,6 +134,18 @@ export default function ExerciseCard(p: Props) {
     }
   }
 
+  async function saveNote() {
+    const value = noteDraft.trim();
+    try {
+      const res = await api.patch<{ notes: string | null }>(`/exercises/${exercise.id}/note`, { note: value });
+      setNote(res.notes ?? "");
+      exercise.notes = res.notes;
+    } catch {
+      // keep the old note on a failed save
+    }
+    setEditingNote(false);
+  }
+
   async function deleteSet(id: string) {
     await api.delete(`/workouts/sets/${id}`);
     p.onChange();
@@ -132,7 +167,14 @@ export default function ExerciseCard(p: Props) {
           {done ? "✓" : p.index + 1}
         </span>
         <span className="flex-1 min-w-0">
-          <span className="block font-semibold truncate">{exercise.name}</span>
+          <span className="block font-semibold truncate">
+            {p.supersetLabel && (
+              <span className="mr-1.5 align-middle text-[10px] font-bold tracking-wide text-brand-700 bg-brand-50 rounded px-1.5 py-0.5">
+                SUPERSET {p.supersetLabel}
+              </span>
+            )}
+            {exercise.name}
+          </span>
           <span className="block text-xs text-gray-500 truncate">
             {item.targetSets} × {item.repsMin}-{item.repsMax}
             {bestLast ? ` · vorige keer ${bestLast.weight} kg` : ""}
@@ -158,6 +200,16 @@ export default function ExerciseCard(p: Props) {
           </div>
           {menu && (
             <div className="grid grid-cols-2 gap-1.5">
+              {p.onToggleSuperset && (
+                <button
+                  type="button"
+                  disabled={p.index === p.total - 1}
+                  onClick={p.onToggleSuperset}
+                  className="col-span-2 py-2 rounded-lg border border-gray-200 text-xs font-medium disabled:opacity-30"
+                >
+                  {p.linkedWithNext ? "Ontkoppel van de volgende (superset)" : "Superset met de volgende oefening"}
+                </button>
+              )}
               <button type="button" disabled={p.index === 0} onClick={() => p.onMove(-1)} className="py-2 rounded-lg border border-gray-200 text-xs font-medium disabled:opacity-30">
                 ▲ Omhoog
               </button>
@@ -172,6 +224,55 @@ export default function ExerciseCard(p: Props) {
               </button>
               {sets.length > 0 && <p className="col-span-2 text-[11px] text-gray-400">Vervangen en verwijderen kan alleen zolang er geen sets gelogd zijn.</p>}
             </div>
+          )}
+
+          {editingNote ? (
+            <div className="space-y-1.5">
+              <textarea
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                rows={2}
+                maxLength={400}
+                placeholder="bv. stoel op 4, smalle grip, link naar een techniekvideo"
+                className="w-full rounded-lg border border-gray-200 bg-bg-raised px-3 py-2 text-sm focus:outline-none focus:border-gray-900"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button type="button" onClick={saveNote} className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold">
+                  Opslaan
+                </button>
+                <button type="button" onClick={() => setEditingNote(false)} className="px-3 py-1.5 rounded-lg bg-gray-100 text-xs font-medium">
+                  Annuleer
+                </button>
+              </div>
+            </div>
+          ) : note ? (
+            <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 flex justify-between gap-2">
+              <span className="min-w-0">
+                <Linkified text={note} />
+              </span>
+              <button
+                type="button"
+                className="shrink-0 font-semibold text-amber-700"
+                onClick={() => {
+                  setNoteDraft(note);
+                  setEditingNote(true);
+                }}
+              >
+                Wijzig
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="text-xs text-gray-500 font-medium"
+              onClick={() => {
+                setNoteDraft("");
+                setEditingNote(true);
+              }}
+            >
+              + Notitie bij deze oefening
+            </button>
           )}
 
           {lastSets && lastSets.length > 0 && (
