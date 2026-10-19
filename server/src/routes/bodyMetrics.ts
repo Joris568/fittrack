@@ -19,6 +19,7 @@ const metricSchema = z.object({
   bodyFatPct: z.number().min(0).max(100).optional(),
   waistCm: z.number().min(0).optional(),
   chestCm: z.number().min(0).optional(),
+  shoulderCm: z.number().min(0).optional(),
   armCm: z.number().min(0).optional(),
   thighCm: z.number().min(0).optional(),
   hipCm: z.number().min(0).optional(),

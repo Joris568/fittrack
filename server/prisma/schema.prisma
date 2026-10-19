@@ -195,6 +195,7 @@ model BodyMetric {
   bodyFatPct Float?
   waistCm    Float?
   chestCm    Float?
+  shoulderCm Float?
   armCm      Float?
   thighCm    Float?
   hipCm      Float?

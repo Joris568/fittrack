@@ -18,23 +18,44 @@ export const profileSchema = z.object({
   trainDays: nullable(z.number().int().min(1).max(7)),
   injuries: nullable(z.string().max(300)),
   coachNotes: z.array(z.string().trim().min(1).max(200)).max(40).optional(),
+  priorityMuscles: z.array(z.enum(["Borst", "Rug", "Schouders", "Armen", "Benen", "Core"])).max(6).optional(),
 });
+
+const present = (profile: Awaited<ReturnType<typeof computeInsights>>["profile"]) =>
+  profile
+    ? {
+        ...profile,
+        coachNotes: undefined,
+        priorityMuscles: (() => {
+          try {
+            const v = JSON.parse(profile.priorityMuscles ?? "[]");
+            return Array.isArray(v) ? v : [];
+          } catch {
+            return [];
+          }
+        })(),
+      }
+    : null;
 
 profileRouter.get("/", async (req: AuthedRequest, res) => {
   const { profile, notes, ...insights } = await computeInsights(req.userId!);
-  res.json({ profile: profile ? { ...profile, coachNotes: undefined } : null, notes, insights });
+  res.json({ profile: present(profile), notes, insights });
 });
 
 profileRouter.put("/", async (req: AuthedRequest, res) => {
   const parsed = profileSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-  const { coachNotes, ...fields } = parsed.data;
-  const data = { ...fields, ...(coachNotes ? { coachNotes: JSON.stringify(coachNotes) } : {}) };
+  const { coachNotes, priorityMuscles, ...fields } = parsed.data;
+  const data = {
+    ...fields,
+    ...(coachNotes ? { coachNotes: JSON.stringify(coachNotes) } : {}),
+    ...(priorityMuscles ? { priorityMuscles: JSON.stringify(priorityMuscles) } : {}),
+  };
   await prisma.userProfile.upsert({
     where: { userId: req.userId! },
     update: data,
     create: { userId: req.userId!, ...data },
   });
   const { profile, notes, ...insights } = await computeInsights(req.userId!);
-  res.json({ profile: profile ? { ...profile, coachNotes: undefined } : null, notes, insights });
+  res.json({ profile: present(profile), notes, insights });
 });

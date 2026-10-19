@@ -4,6 +4,7 @@ import { api } from "../api/client.js";
 import { AiInsight, DashboardData, DeloadSignal, WeeklyCheckin, WeeklyReportContent } from "../api/types.js";
 import { Card, Button, Spinner, PageTitle } from "../components/ui.js";
 import { MiniBars, Ring, Sparkline } from "../components/charts.js";
+import BodyMap from "../components/BodyMap.js";
 
 const DAY_LABELS = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
 
@@ -22,6 +23,10 @@ function formatDay(dayKey: string, today: string): string {
     month: "long",
     timeZone: "UTC",
   });
+}
+
+function daysBetween(fromKey: string, toKey: string): number {
+  return Math.round((new Date(`${toKey}T00:00:00Z`).getTime() - new Date(`${fromKey}T00:00:00Z`).getTime()) / 86_400_000);
 }
 
 function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
@@ -333,6 +338,13 @@ export default function Dashboard() {
         </Link>
       )}
 
+      {p.photos.lastDate && daysBetween(p.photos.lastDate, data.today) >= 28 && (
+        <Link to="/coach" className="block rounded-xl border border-gray-200 bg-surface px-4 py-3">
+          <p className="font-semibold text-sm">Tijd voor je maandelijkse foto-check</p>
+          <p className="text-xs text-gray-500 mt-0.5">Je laatste foto is {daysBetween(p.photos.lastDate, data.today)} dagen oud. Zelfde plek, zelfde licht, dan zie je pas echt verschil.</p>
+        </Link>
+      )}
+
       <WeekStrip data={data} onSelect={(d) => load(d)} />
 
       <LevelCard g={data.gamification} />
@@ -530,6 +542,43 @@ export default function Dashboard() {
           </Card>
 
           <Card className="!p-3.5">
+            <p className="text-xs text-gray-500">V-taper (schouders / taille)</p>
+            {p.vtaper ? (
+              <>
+                <p className="font-display font-bold text-2xl mt-1">
+                  {p.vtaper.ratio.toFixed(2)}
+                  <span className="text-sm font-medium text-gray-400"> / {p.vtaper.target}</span>
+                </p>
+                <p className="text-xs text-gray-500">
+                  {p.vtaper.level}
+                  {p.vtaper.delta != null && p.vtaper.delta !== 0 && (
+                    <span className={p.vtaper.delta > 0 ? "text-brand-600 font-semibold" : "text-gray-500"}>
+                      {" "}
+                      · {p.vtaper.delta > 0 ? "+" : ""}
+                      {p.vtaper.delta}
+                    </span>
+                  )}
+                </p>
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2">
+                  <div className="h-full bg-brand-500 rounded-full" style={{ width: `${Math.min(100, (p.vtaper.ratio / p.vtaper.target) * 100)}%` }} />
+                </div>
+                {p.vtaper.series.length > 1 && (
+                  <div className="mt-2">
+                    <Sparkline values={p.vtaper.series.map((s) => s.value)} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-500 mt-1.5">Meet je schouders en taille, dan zie je hier je V-taper score.</p>
+                <Link to="/settings" className="text-xs text-brand-600 font-medium">
+                  Metingen invullen
+                </Link>
+              </>
+            )}
+          </Card>
+
+          <Card className="!p-3.5 col-span-2">
             <p className="text-xs text-gray-500">Foto&apos;s</p>
             {p.photos.latest.length > 0 ? (
               <div className="grid grid-cols-3 gap-1 mt-2">
@@ -543,16 +592,22 @@ export default function Dashboard() {
             <Link to="/coach" className="block text-xs text-brand-600 font-medium mt-2">
               {p.photos.count > 0 ? `${p.photos.count} foto's · laat de coach kijken` : "Foto uploaden in de coach"}
             </Link>
+            {p.photos.count >= 2 && (
+              <Link to="/photos" className="block text-xs text-brand-600 font-medium mt-1">
+                Voor/na vergelijken
+              </Link>
+            )}
           </Card>
         </div>
       </div>
 
       <Card>
         <SectionTitle action={<span className="text-xs text-gray-500">laatste 7 dagen</span>}>Sets per spiergroep</SectionTitle>
+        <BodyMap volume={p.muscleVolume} priorities={p.priorities} />
         {p.muscleVolume.length === 0 ? (
-          <p className="text-sm text-gray-400">Nog geen sets gelogd deze week.</p>
+          <p className="text-sm text-gray-400 mt-3">Nog geen sets gelogd deze week.</p>
         ) : (
-          <div className="space-y-2.5">
+          <div className="space-y-2.5 mt-4">
             {p.muscleVolume.map((m) => (
               <div key={m.group}>
                 <div className="flex justify-between text-xs mb-1">
@@ -568,7 +623,7 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
-            <p className="text-[11px] text-gray-400">De lichtoranje zone is 6-12 harde sets per week, genoeg voor groei zonder te veel te doen.</p>
+            <p className="text-[11px] text-gray-400">De lichtoranje zone is 6-12 harde sets per week. {p.priorities.length > 0 ? `Je focus (${p.priorities.join(", ")}) mag naar 12 of meer.` : "Kies je focus-spieren in je profiel."}</p>
           </div>
         )}
       </Card>

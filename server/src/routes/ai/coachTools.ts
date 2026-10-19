@@ -476,12 +476,19 @@ Antwoord in het Nederlands, direct en feitelijk, max 6 zinnen. Dit is voor train
           experience: { type: "string", enum: ["beginner", "intermediate", "advanced"] },
           trainDays: { type: "number" },
           injuries: { type: "string" },
+          priorityMuscles: {
+            type: "array",
+            items: { type: "string", enum: ["Borst", "Rug", "Schouders", "Armen", "Benen", "Core"] },
+            description: "Spiergroepen waar de gebruiker extra op wil focussen (krijgen meer volume op de lichaamskaart)",
+          },
         },
       },
       execute: async (input: Record<string, unknown>) => {
         const parsed = profileSchema.omit({ coachNotes: true }).safeParse(input);
         if (!parsed.success) return { error: "Ongeldige waarde in het profiel.", details: parsed.error.flatten().fieldErrors };
-        await prisma.userProfile.upsert({ where: { userId }, update: parsed.data, create: { userId, ...parsed.data } });
+        const { priorityMuscles, ...rest } = parsed.data;
+        const data = { ...rest, ...(priorityMuscles ? { priorityMuscles: JSON.stringify(priorityMuscles) } : {}) };
+        await prisma.userProfile.upsert({ where: { userId }, update: data, create: { userId, ...data } });
         return { saved: Object.keys(parsed.data) };
       },
     },

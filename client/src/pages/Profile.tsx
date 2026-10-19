@@ -70,8 +70,8 @@ export default function Profile() {
     setSaving(true);
     setMessage(null);
     try {
-      const { heightCm, birthYear, sex, activity, goal, experience, trainDays, injuries } = form;
-      apply(await api.put<ProfileResponse>("/profile", { heightCm, birthYear, sex, activity, goal, experience, trainDays, injuries: injuries || null }));
+      const { heightCm, birthYear, sex, activity, goal, experience, trainDays, injuries, priorityMuscles } = form;
+      apply(await api.put<ProfileResponse>("/profile", { heightCm, birthYear, sex, activity, goal, experience, trainDays, injuries: injuries || null, priorityMuscles: priorityMuscles ?? [] }));
       setMessage("Opgeslagen");
     } catch {
       setMessage("Opslaan mislukt. Controleer lengte (120-230) en geboortejaar.");
@@ -133,6 +133,29 @@ export default function Profile() {
         </Field>
         <Field label="Dagelijkse activiteit (zonder training)">
           <Chips value={form.activity} options={ACTIVITY} onChange={(v) => setForm((f) => ({ ...f, activity: v }))} />
+        </Field>
+        <Field label="Waar wil je extra op focussen? (lichaamskaart en volume)">
+          <div className="flex flex-wrap gap-1.5">
+            {["Schouders", "Rug", "Borst", "Armen", "Benen", "Core"].map((g) => {
+              const on = (form.priorityMuscles ?? []).includes(g);
+              return (
+                <button
+                  key={g}
+                  type="button"
+                  onClick={() =>
+                    setForm((f) => ({
+                      ...f,
+                      priorityMuscles: on ? (f.priorityMuscles ?? []).filter((x) => x !== g) : [...(f.priorityMuscles ?? []), g],
+                    }))
+                  }
+                  className={`px-3 py-2 rounded-lg text-sm border ${on ? "bg-gray-900 text-white border-gray-900" : "bg-surface text-gray-700 border-gray-200"}`}
+                >
+                  {g}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-gray-400 mt-1">Voor een brede V-taper kies je Schouders en Rug.</p>
         </Field>
         <Field label="Blessures of beperkingen">
           <Input placeholder="bv. rechterschouder, lage rug" value={form.injuries ?? ""} onChange={(e) => setForm((f) => ({ ...f, injuries: e.target.value }))} />

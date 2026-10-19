@@ -4,6 +4,7 @@ import type { AuthedRequest } from "../auth/middleware.js";
 import { XP, levelFromXp, levelTitle, questProgress, weeklySessionTarget, WEEKLY_QUESTS, type WeekStats } from "../gamification/xp.js";
 import { linearSlope, movingAverage } from "../lib/nutritionCalc.js";
 import { computeXpTotal } from "../gamification/xpTotals.js";
+import { vtaperRatio, vtaperLevel, VTAPER_TARGET } from "../lib/vtaper.js";
 
 export const dashboardRouter = Router();
 
@@ -53,7 +54,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
         foodItem: { select: { caloriesPer100g: true, proteinPer100g: true, carbsPer100g: true, fatPer100g: true } },
       },
     }),
-    prisma.bodyMetric.findMany({ where: { userId }, orderBy: { date: "asc" }, select: { date: true, weightKg: true } }),
+    prisma.bodyMetric.findMany({ where: { userId }, orderBy: { date: "asc" }, select: { date: true, weightKg: true, shoulderCm: true, waistCm: true } }),
     prisma.progressPhoto.count({ where: { userId } }),
     prisma.progressPhoto.findMany({
       where: { userId },
@@ -72,7 +73,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
       orderBy: { createdAt: "asc" },
       include: { programDay: { select: { name: true, program: { select: { name: true } } } } },
     }),
-    prisma.userProfile.findUnique({ where: { userId }, select: { heightCm: true, goal: true, birthYear: true, trainDays: true } }),
+    prisma.userProfile.findUnique({ where: { userId }, select: { heightCm: true, goal: true, birthYear: true, trainDays: true, priorityMuscles: true } }),
     // sets in the last 7 days per muscle group (rolling week, in the user's timezone)
     prisma.setLog.findMany({
       where: { isWarmup: false, workoutSession: { userId, date: { gte: new Date(new Date(`${addDays(todayKey, -6)}T00:00:00Z`).getTime() + tz * 60_000) } } },
@@ -247,6 +248,29 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
     rateStatus = ratePct < lo ? (profile.goal === "cut" ? "te-snel" : "te-langzaam") : ratePct > hi ? (profile.goal === "cut" ? "te-langzaam" : "te-snel") : "op-schema";
   }
 
+  // V-taper: shoulders over waist, from the measurements that have both
+  const withBoth = metrics.filter((m) => vtaperRatio(m.shoulderCm, m.waistCm) !== null);
+  const vtaperSeries = withBoth.slice(-12).map((m) => ({ date: dayKeyOf(m.date), value: vtaperRatio(m.shoulderCm, m.waistCm)! }));
+  const lastBoth = withBoth[withBoth.length - 1];
+  const vtaper = lastBoth
+    ? {
+        ratio: vtaperRatio(lastBoth.shoulderCm, lastBoth.waistCm)!,
+        level: vtaperLevel(vtaperRatio(lastBoth.shoulderCm, lastBoth.waistCm)!),
+        shoulderCm: lastBoth.shoulderCm,
+        waistCm: lastBoth.waistCm,
+        target: VTAPER_TARGET,
+        delta: vtaperSeries.length > 1 ? Math.round((vtaperSeries[vtaperSeries.length - 1].value - vtaperSeries[0].value) * 100) / 100 : null,
+        series: vtaperSeries,
+      }
+    : null;
+  let priorities: string[] = [];
+  try {
+    const v = JSON.parse(profile?.priorityMuscles ?? "[]");
+    if (Array.isArray(v)) priorities = v;
+  } catch {
+    // ignore malformed priorities
+  }
+
   res.json({
     today: todayKey,
     selected: selectedKey,
@@ -278,10 +302,12 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
         goal: profile?.goal ?? null,
       },
       muscleVolume,
+      priorities,
+      vtaper,
       missed,
       calories: { average: avgCalories, series: calorieSeries },
       sessionsPerWeek,
-      photos: { count: photoCount, latest: latestPhotos },
+      photos: { count: photoCount, latest: latestPhotos, lastDate: latestPhotos[0] ? dayKeyOf(latestPhotos[0].date) : null },
     },
     gamification: {
       xp,

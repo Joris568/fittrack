@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const [weight, setWeight] = useState("");
   const [bodyFat, setBodyFat] = useState("");
   const [showMeasurements, setShowMeasurements] = useState(false);
-  const [measurements, setMeasurements] = useState({ waist: "", chest: "", arm: "", thigh: "", hip: "" });
+  const [measurements, setMeasurements] = useState({ waist: "", shoulder: "", chest: "", arm: "", thigh: "", hip: "" });
   const [gamification, setGamification] = useState<GamificationSummary | null>(null);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -49,6 +49,7 @@ export default function SettingsPage() {
       weightKg: Number(weight),
       bodyFatPct: bodyFat ? Number(bodyFat) : undefined,
       waistCm: measurements.waist ? Number(measurements.waist) : undefined,
+      shoulderCm: measurements.shoulder ? Number(measurements.shoulder) : undefined,
       chestCm: measurements.chest ? Number(measurements.chest) : undefined,
       armCm: measurements.arm ? Number(measurements.arm) : undefined,
       thighCm: measurements.thigh ? Number(measurements.thigh) : undefined,
@@ -56,7 +57,7 @@ export default function SettingsPage() {
     });
     setWeight("");
     setBodyFat("");
-    setMeasurements({ waist: "", chest: "", arm: "", thigh: "", hip: "" });
+    setMeasurements({ waist: "", shoulder: "", chest: "", arm: "", thigh: "", hip: "" });
     load();
   }
 
@@ -186,6 +187,13 @@ export default function SettingsPage() {
             <Input
               type="number"
               inputMode="decimal"
+              placeholder="Schouders (cm)"
+              value={measurements.shoulder}
+              onChange={(e) => setMeasurements((m) => ({ ...m, shoulder: e.target.value }))}
+            />
+            <Input
+              type="number"
+              inputMode="decimal"
               placeholder="Borst (cm)"
               value={measurements.chest}
               onChange={(e) => setMeasurements((m) => ({ ...m, chest: e.target.value }))}
@@ -212,7 +220,7 @@ export default function SettingsPage() {
               onChange={(e) => setMeasurements((m) => ({ ...m, hip: e.target.value }))}
             />
             <p className="text-xs text-gray-400 col-span-2">
-              Wordt meegenomen bij je volgende gewichtslog hierboven.
+              Wordt meegenomen bij je volgende gewichtslog hierboven. Voor je V-taper score: meet je schouders rondom op het breedste punt (over je delts, armen ontspannen) en je taille op navelhoogte, steeds op dezelfde manier.
             </p>
           </form>
         )}
@@ -258,7 +266,14 @@ export default function SettingsPage() {
 
       <Card>
         <div className="flex justify-between items-center mb-2">
-          <h2 className="font-semibold">Voortgangsfoto&apos;s</h2>
+          <h2 className="font-semibold">
+            Voortgangsfoto&apos;s{" "}
+            {photos.length >= 2 && (
+              <Link to="/photos" className="ml-1 text-xs font-medium text-brand-600">
+                vergelijk
+              </Link>
+            )}
+          </h2>
           <Button
             variant="secondary"
             className="!px-3 !py-1.5 text-sm"

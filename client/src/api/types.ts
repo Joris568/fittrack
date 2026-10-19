@@ -310,7 +310,9 @@ export interface DashboardData {
     missed: { id: string; date: string; title: string }[];
     calories: { average: number | null; series: { date: string; value: number }[] };
     sessionsPerWeek: { date: string; value: number }[];
-    photos: { count: number; latest: { id: string; date: string; imageData: string }[] };
+    photos: { count: number; latest: { id: string; date: string; imageData: string }[]; lastDate: string | null };
+    priorities: string[];
+    vtaper: { ratio: number; level: string; shoulderCm: number | null; waistCm: number | null; target: number; delta: number | null; series: { date: string; value: number }[] } | null;
   };
   gamification: {
     xp: number;
@@ -356,6 +358,7 @@ export interface UserProfile {
   experience: "beginner" | "intermediate" | "advanced" | null;
   trainDays: number | null;
   injuries: string | null;
+  priorityMuscles?: string[];
 }
 
 export interface ProfileResponse {
