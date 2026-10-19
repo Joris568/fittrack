@@ -81,7 +81,7 @@ export default function ExerciseCard(p: Props) {
         const filtered = h.filter((s) => s.workoutSessionId !== sessionId && !s.isWarmup);
         const lastSession = filtered.filter((s) => s.workoutSessionId === filtered[0]?.workoutSessionId).reverse();
         setLastSets(lastSession);
-        const next = suggestNext(lastSession, item.repsMin, item.repsMax);
+        const next = suggestNext(lastSession, item.repsMin, item.repsMax, lastSession[0]?.workoutSession?.rating);
         setSuggestion(next);
         if (next && !prefilled.current && working.length === 0) {
           setWeight(String(next.weight));

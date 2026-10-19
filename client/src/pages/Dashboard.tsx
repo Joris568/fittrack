@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client.js";
-import { AiInsight, DashboardData, WeeklyReportContent } from "../api/types.js";
+import { AiInsight, DashboardData, DeloadSignal, WeeklyCheckin, WeeklyReportContent } from "../api/types.js";
 import { Card, Button, Spinner, PageTitle } from "../components/ui.js";
 import { MiniBars, Ring, Sparkline } from "../components/charts.js";
 
@@ -151,11 +151,107 @@ function QuestsCard({ quests }: { quests: DashboardData["gamification"]["quests"
   );
 }
 
+function WeeklyCheckinCard({ data, onDone }: { data: WeeklyCheckin; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  if (!data.available || data.hidden || !data.result || data.result.status === "te-weinig-data") return null;
+  const r = data.result;
+  const g = data.currentGoal!;
+  const n = data.newGoal;
+
+  async function handle(apply: boolean) {
+    setBusy(true);
+    try {
+      await api.post("/checkin/weekly/handle", { apply });
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <SectionTitle action={<span className="text-xs text-gray-500">deze week</span>}>Weekcheck</SectionTitle>
+      <p className="text-sm text-gray-700">{r.text}</p>
+      {n && (
+        <div className="mt-3 rounded-lg bg-gray-50 px-3 py-2.5 text-sm">
+          <p>
+            <span className="text-gray-500">Nu</span> {g.calories} kcal <span className="text-gray-400">→</span>{" "}
+            <span className="font-display font-bold">{n.calories} kcal</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            eiwit {n.proteinGrams} g · koolhydraten {n.carbsGrams} g · vet {n.fatGrams} g
+          </p>
+        </div>
+      )}
+      <div className="flex gap-2 mt-3">
+        {n ? (
+          <>
+            <Button className="flex-1" onClick={() => handle(true)} disabled={busy}>
+              Pas toe
+            </Button>
+            <Button variant="secondary" onClick={() => handle(false)} disabled={busy}>
+              Laat zo
+            </Button>
+          </>
+        ) : (
+          <Button variant="secondary" className="w-full" onClick={() => handle(false)} disabled={busy}>
+            Top, doorgaan
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function DeloadCard({ signal, onAsk }: { signal: DeloadSignal; onAsk: () => void }) {
+  const [hidden, setHidden] = useState(() => {
+    try {
+      return Number(localStorage.getItem("deload-dismissed") ?? 0) > Date.now();
+    } catch {
+      return false;
+    }
+  });
+  if (!signal.suggested || hidden) return null;
+  return (
+    <Card className="!border-amber-200 !bg-amber-50">
+      <h2 className="font-display font-bold text-lg text-amber-900">Tijd voor een rustigere week?</h2>
+      <ul className="mt-1.5 space-y-0.5">
+        {signal.reasons.map((r) => (
+          <li key={r} className="text-sm text-amber-900">
+            · {r}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs text-amber-800 mt-2">Een deload (ongeveer de helft van de sets) laat je herstellen, daarna ga je vaak weer sterker door.</p>
+      <div className="flex gap-2 mt-3">
+        <Button className="flex-1" onClick={onAsk}>
+          Laat de coach een deload plannen
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            try {
+              localStorage.setItem("deload-dismissed", String(Date.now() + 7 * 86_400_000));
+            } catch {
+              // ignore
+            }
+            setHidden(true);
+          }}
+        >
+          Niet nu
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [checkin, setCheckin] = useState<WeeklyCheckin | null>(null);
+  const [deload, setDeload] = useState<DeloadSignal | null>(null);
   const [advice, setAdvice] = useState<AiInsight<{ text: string }> | null>(null);
   const [adviceLoading, setAdviceLoading] = useState(false);
   const [report, setReport] = useState<AiInsight<WeeklyReportContent> | null>(null);
@@ -174,6 +270,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
+    api.get<WeeklyCheckin>("/checkin/weekly").then(setCheckin).catch(() => {});
+    api.get<DeloadSignal>("/checkin/deload").then(setDeload).catch(() => {});
     api.get<AiInsight<{ text: string }> | null>("/ai/nutrition-advice/latest").then(setAdvice).catch(() => {});
     api
       .get<AiInsight<WeeklyReportContent>>("/ai/weekly-report/latest")
@@ -239,6 +337,18 @@ export default function Dashboard() {
 
       <LevelCard g={data.gamification} />
       <QuestsCard quests={data.gamification.quests} />
+
+      {checkin && <WeeklyCheckinCard data={checkin} onDone={() => api.get<WeeklyCheckin>("/checkin/weekly").then(setCheckin)} />}
+      {deload && (
+        <DeloadCard
+          signal={deload}
+          onAsk={async () => {
+            const why = deload.reasons.join("; ");
+            await api.post("/ai/chat", { message: `Ik krijg deload-signalen (${why}). Maak een deload-week voor me: pas mijn actieve programma aan voor één week met ongeveer de helft van de sets en plan het in mijn agenda. Zeg wat je gedaan hebt.` }).catch(() => {});
+            navigate("/coach");
+          }}
+        />
+      )}
 
       <Card>
         <SectionTitle

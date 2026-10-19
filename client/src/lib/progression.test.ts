@@ -28,6 +28,14 @@ describe("double progression", () => {
     expect(s.kind).toBe("increase");
   });
 
+  it("uses the rating of last session: too easy steps up one rep early, crushed holds", () => {
+    const nearTop = [{ weight: 80, reps: 9 }, { weight: 80, reps: 9 }];
+    expect(suggestNext(nearTop, 8, 10)!.kind).toBe("push");
+    expect(suggestNext(nearTop, 8, 10, 1)!.kind).toBe("increase");
+    const top = [{ weight: 80, reps: 10 }, { weight: 80, reps: 10 }];
+    expect(suggestNext(top, 8, 10, 3)!.kind).not.toBe("increase");
+  });
+
   it("returns nothing without history; steps scale with the weight", () => {
     expect(suggestNext([], 8, 10)).toBeNull();
     expect(weightStep(10)).toBe(1);

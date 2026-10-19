@@ -51,7 +51,7 @@ export interface SetLog {
   isWarmup?: boolean;
   createdAt: string;
   /** Only present on the /workouts/exercise/:id/history endpoint. */
-  workoutSession?: { date: string };
+  workoutSession?: { date: string; rating?: number | null };
 }
 
 export interface WorkoutSession {
@@ -62,6 +62,8 @@ export interface WorkoutSession {
   date: string;
   notes?: string | null;
   finishedAt?: string | null;
+  readiness?: string | null;
+  rating?: number | null;
   layout?: string | null;
   setLogs: SetLog[];
 }
@@ -415,4 +417,25 @@ export interface WorkoutSummary {
   };
   week: { sessions: number; target: number; streakWeeks: number };
   coachLine: string;
+}
+
+export interface WeeklyCheckin {
+  available: boolean;
+  hidden?: boolean;
+  result?: {
+    status: "op-schema" | "te-langzaam" | "te-snel" | "te-weinig-data";
+    ratePerWeek: number | null;
+    ratePct: number | null;
+    deltaKcal: number;
+    newCalories: number;
+    text: string;
+  };
+  currentGoal?: { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number };
+  newGoal?: { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number } | null;
+}
+
+export interface DeloadSignal {
+  suggested: boolean;
+  score: number;
+  reasons: string[];
 }

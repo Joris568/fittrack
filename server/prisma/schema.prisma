@@ -96,6 +96,8 @@ model WorkoutSession {
   date         DateTime @default(now())
   notes        String?
   finishedAt   DateTime?
+  readiness    String?  // JSON {sleep, soreness, energy, score} from the pre-workout check
+  rating       Int?     // 1 = too easy, 2 = good, 3 = crushed me
   layout       String?  // JSON: the user's own exercise order/swaps for this session
   createdAt    DateTime @default(now())
 
@@ -310,5 +312,7 @@ model UserProfile {
   trainDays   Int?     // intended training days per week
   injuries    String?
   coachNotes  String?  // JSON array of short facts the coach should remember
+  checkinHandledAt DateTime? // when the weekly calorie check-in was last applied or dismissed
+  priorityMuscles  String?   // JSON array of muscle groups the user wants to emphasise
   updatedAt   DateTime @updatedAt
 }

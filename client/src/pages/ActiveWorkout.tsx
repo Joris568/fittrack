@@ -6,6 +6,7 @@ import { Spinner } from "../components/ui.js";
 import { useWakeLock } from "../lib/wakeLock.js";
 import ExercisePicker from "../components/ExercisePicker.js";
 import ExerciseSheet from "../components/ExerciseSheet.js";
+import ReadinessCard, { type Readiness } from "../components/workout/ReadinessCard.js";
 import RestTimer from "../components/RestTimer.js";
 import ExerciseCard from "../components/workout/ExerciseCard.js";
 import {
@@ -174,6 +175,25 @@ export default function ActiveWorkout() {
       {toast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 max-w-[92%] animate-pop rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium shadow-card">
           {toast}
+        </div>
+      )}
+
+      {(session.readiness || session.setLogs.length === 0) && (
+        <div className="mb-3">
+          <ReadinessCard
+            saved={(() => {
+              try {
+                return session.readiness ? (JSON.parse(session.readiness) as Readiness) : null;
+              } catch {
+                return null;
+              }
+            })()}
+            onSave={(r) => {
+              setSession((s) => (s ? { ...s, readiness: JSON.stringify(r) } : s));
+              api.patch(`/workouts/${session.id}`, { readiness: JSON.stringify(r) }).catch(() => {});
+            }}
+            onTrim={() => persist(layout.map((i) => ({ ...i, targetSets: Math.max(1, i.targetSets - 1) })))}
+          />
         </div>
       )}
 

@@ -35,6 +35,23 @@ export async function buildUserContext(userId: string): Promise<string> {
 
   const lines: string[] = [await buildProfileContext(userId), ""];
 
+  const feel = sessions.filter((s) => s.readiness || s.rating).slice(-5);
+  if (feel.length) {
+    lines.push("## Hoe de laatste trainingen aanvoelden (zelf aangegeven)");
+    for (const s of feel) {
+      let ready = "";
+      try {
+        const r = s.readiness ? (JSON.parse(s.readiness) as { score?: number }) : null;
+        if (r?.score !== undefined) ready = `readiness ${r.score}/9`;
+      } catch {
+        // ignore malformed readiness
+      }
+      const rate = s.rating === 1 ? "te makkelijk" : s.rating === 3 ? "kapot" : s.rating === 2 ? "goed" : "";
+      lines.push(`- ${s.date.toISOString().slice(0, 10)} ${s.programDay?.name ?? "training"}: ${[ready, rate && `achteraf: ${rate}`].filter(Boolean).join(", ")}`);
+    }
+    lines.push("");
+  }
+
   // Training summary: per exercise, chronological top-set trend.
   lines.push("## Trainingsgeschiedenis (laatste 6 weken)");
   if (sessions.length === 0) {

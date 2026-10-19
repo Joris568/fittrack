@@ -23,7 +23,7 @@ const round = (n: number) => Math.round(n * 100) / 100;
 /** Double progression on the previous session's sets: once every set at the top weight hits
  * the top of the rep range (and wasn't an all-out grind), add weight and restart at the
  * bottom; otherwise keep the weight and aim for one more rep. */
-export function suggestNext(lastSets: PastSet[], repsMin: number, repsMax: number): Suggestion | null {
+export function suggestNext(lastSets: PastSet[], repsMin: number, repsMax: number, lastRating?: number | null): Suggestion | null {
   if (lastSets.length === 0 || repsMax < repsMin) return null;
   const top = Math.max(...lastSets.map((s) => s.weight));
   const atTop = lastSets.filter((s) => s.weight === top);
@@ -32,7 +32,12 @@ export function suggestNext(lastSets: PastSet[], repsMin: number, repsMax: numbe
   const grind = atTop.some((s) => s.rpe != null && s.rpe >= 10);
   const step = weightStep(top);
 
-  if (minReps >= repsMax && !grind) {
+  // How the user rated that session: "te makkelijk" (1) allows a step up one rep early,
+  // "kapot" (3) holds the weight instead of adding more.
+  const easy = lastRating === 1;
+  const crushed = lastRating === 3;
+
+  if ((minReps >= repsMax || (easy && minReps >= repsMax - 1)) && !grind && !crushed) {
     return {
       kind: "increase",
       weight: round(top + step),

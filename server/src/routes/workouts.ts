@@ -54,6 +54,8 @@ const createSessionSchema = z.object({
   notes: z.string().optional(),
   date: z.string().datetime().optional(),
   layout: z.string().max(8000).optional(),
+  readiness: z.string().max(300).optional(),
+  rating: z.number().int().min(1).max(3).optional(),
 });
 
 workoutsRouter.post("/", async (req: AuthedRequest, res) => {
@@ -80,6 +82,8 @@ workoutsRouter.patch("/:id", async (req: AuthedRequest, res) => {
       notes: parsed.data.notes,
       date: parsed.data.date ? new Date(parsed.data.date) : undefined,
       layout: parsed.data.layout,
+      readiness: parsed.data.readiness,
+      rating: parsed.data.rating,
     },
   });
   if (result.count === 0) return res.status(404).json({ error: "Not found" });

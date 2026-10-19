@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
 import { WorkoutSummary as Summary } from "../api/types.js";
 import { Button, Card, Spinner } from "../components/ui.js";
+import SuggestionsPanel from "../components/SuggestionsPanel.js";
 
 const CONFETTI_COLORS = ["#E5481A", "#161512", "#FF9A6E", "#F5C563", "#FFFFFF"];
 
@@ -89,6 +90,12 @@ export default function WorkoutSummaryPage() {
   const [error, setError] = useState(false);
   const [asking, setAsking] = useState(false);
   const fresh = !!state?.fresh;
+  const [rating, setRating] = useState<number | null>(null);
+
+  async function rate(value: number) {
+    setRating(value);
+    if (id) await api.patch(`/workouts/${id}`, { rating: value }).catch(() => {});
+  }
 
   useEffect(() => {
     if (summary || !id) return;
@@ -252,6 +259,29 @@ export default function WorkoutSummaryPage() {
           </p>
         )}
       </Card>
+
+      <Card className="animate-rise">
+        <h2 className="font-display font-bold text-lg mb-1">Hoe was deze training?</h2>
+        <p className="text-xs text-gray-500 mb-3">Dit stuurt je suggesties voor de volgende keer.</p>
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            { v: 1, l: "Te makkelijk" },
+            { v: 2, l: "Goed" },
+            { v: 3, l: "Kapot" },
+          ].map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => rate(o.v)}
+              className={`py-2.5 rounded-lg text-sm font-semibold border ${rating === o.v ? "bg-gray-900 text-white border-gray-900" : "bg-bg-raised text-gray-600 border-gray-200"}`}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <SuggestionsPanel />
 
       <div className="space-y-2 pt-1">
         <Button className="w-full" onClick={askCoach} disabled={asking}>
