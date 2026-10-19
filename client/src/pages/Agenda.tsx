@@ -4,6 +4,7 @@ import { api } from "../api/client.js";
 import { CalendarDay, WithAchievements, WorkoutProgram } from "../api/types.js";
 import { Button, Card, Input, PageTitle } from "../components/ui.js";
 import { emitAchievements } from "../lib/achievementBus.js";
+import ConsistencyGrid from "../components/ConsistencyGrid.js";
 import { addDays, formatDayLong, formatMonth, todayKey, weekStart } from "../lib/dates.js";
 
 const WEEKDAYS = ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"];
@@ -395,6 +396,14 @@ export default function Agenda() {
           Meerdere weken inplannen
         </Button>
       )}
+
+      <Card>
+        <h2 className="font-display font-bold text-lg mb-3">Je consistentie</h2>
+        <ConsistencyGrid />
+        <Link to="/recap" className="block mt-3 text-sm text-brand-600 font-medium">
+          Bekijk je maandoverzicht
+        </Link>
+      </Card>
 
       <p className="text-xs text-gray-500 text-center">
         Liever een hele week in één keer?{" "}

@@ -93,6 +93,24 @@ calendarRouter.get("/", async (req: AuthedRequest, res) => {
   res.json({ days });
 });
 
+/** Sets per day for the last N weeks, for the consistency grid. */
+calendarRouter.get("/heatmap", async (req: AuthedRequest, res) => {
+  const weeks = Math.max(4, Math.min(53, Number(req.query.weeks) || 26));
+  const todayKey = dayKeyOf(new Date(), req.tz);
+  const firstKey = addDaysKey(weekStartKey(todayKey), -7 * (weeks - 1));
+  const since = new Date(new Date(`${firstKey}T00:00:00Z`).getTime() + req.tz * 60_000);
+  const sessions = await prisma.workoutSession.findMany({
+    where: { userId: req.userId, date: { gte: since } },
+    select: { date: true, _count: { select: { setLogs: { where: { isWarmup: false } } } } },
+  });
+  const days: Record<string, number> = {};
+  for (const s of sessions) {
+    const k = dayKeyOf(s.date, req.tz);
+    days[k] = (days[k] ?? 0) + Math.max(1, s._count.setLogs);
+  }
+  res.json({ from: firstKey, to: todayKey, days });
+});
+
 const planSchema = z
   .object({
     date: dayKeySchema,

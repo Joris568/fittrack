@@ -10,6 +10,7 @@ import WorkoutHistory from "./pages/WorkoutHistory.js";
 import FoodLog from "./pages/FoodLog.js";
 import Goals from "./pages/Goals.js";
 import Recipes from "./pages/Recipes.js";
+import Recap from "./pages/Recap.js";
 import PhotoCompare from "./pages/PhotoCompare.js";
 import WorkoutSummaryPage from "./pages/WorkoutSummary.js";
 import Profile from "./pages/Profile.js";
@@ -43,6 +44,7 @@ function AppRoutes() {
                 <Route path="eat" element={<FoodLog />} />
                 <Route path="eat/goals" element={<Goals />} />
                 <Route path="eat/recipes" element={<Recipes />} />
+                <Route path="recap" element={<Recap />} />
                 <Route path="photos" element={<PhotoCompare />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="agenda" element={<Agenda />} />

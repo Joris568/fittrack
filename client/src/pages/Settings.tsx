@@ -324,6 +324,16 @@ export default function SettingsPage() {
         </Card>
       </Link>
 
+      <Link to="/recap" className="block">
+        <Card className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Maandoverzicht</p>
+            <p className="text-xs text-gray-500">Wat je tilde, je records en je consistentie, om te delen</p>
+          </div>
+          <span className="text-gray-400">›</span>
+        </Card>
+      </Link>
+
       {usage && (
         <Card>
           <h2 className="font-semibold mb-1">AI-verbruik deze maand</h2>

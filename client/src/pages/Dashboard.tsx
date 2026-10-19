@@ -345,6 +345,13 @@ export default function Dashboard() {
         </Link>
       )}
 
+      {Number(data.today.slice(8)) <= 7 && (
+        <Link to="/recap" className="block rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
+          <p className="font-semibold text-sm text-brand-700">Je maandoverzicht staat klaar</p>
+          <p className="text-xs text-gray-600 mt-0.5">Bekijk wat je vorige maand hebt getild en je beste records.</p>
+        </Link>
+      )}
+
       <WeekStrip data={data} onSelect={(d) => load(d)} />
 
       <LevelCard g={data.gamification} />

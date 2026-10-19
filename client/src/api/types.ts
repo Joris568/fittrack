@@ -442,3 +442,21 @@ export interface DeloadSignal {
   score: number;
   reasons: string[];
 }
+
+export interface MonthlyRecap {
+  month: string;
+  label: string;
+  isCurrent: boolean;
+  hasData: boolean;
+  totals: { sessions: number; sets: number; volumeKg: number; trainedDays: number; avgDurationMin: number | null };
+  comparison: { count: number; thing: string } | null;
+  prs: { count: number; top: { exercise: string; weight: number; reps: number }[] };
+  topExercise: { name: string; sets: number } | null;
+  topMuscle: { group: string; sets: number } | null;
+  bestWeek: { weekStart: string; sessions: number; volumeKg: number } | null;
+  nutrition: { loggedDays: number; avgCalories: number; avgProtein: number } | null;
+  body: { start: number; end: number; change: number } | null;
+  photos: number;
+  prevMonth: string;
+  nextMonth: string | null;
+}

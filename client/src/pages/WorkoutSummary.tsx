@@ -4,6 +4,7 @@ import { api } from "../api/client.js";
 import { WorkoutSummary as Summary } from "../api/types.js";
 import { Button, Card, Spinner } from "../components/ui.js";
 import SuggestionsPanel from "../components/SuggestionsPanel.js";
+import ShareButton from "../components/ShareButton.js";
 
 const CONFETTI_COLORS = ["#E5481A", "#161512", "#FF9A6E", "#F5C563", "#FFFFFF"];
 
@@ -287,6 +288,21 @@ export default function WorkoutSummaryPage() {
         <Button className="w-full" onClick={askCoach} disabled={asking}>
           {asking ? "Even geduld..." : "Bespreek met de coach"}
         </Button>
+        <ShareButton
+          filename={`fittrack-${summary.session.name.toLowerCase().replace(/\s+/g, "-")}.png`}
+          spec={{
+            eyebrow: "Training klaar",
+            title: summary.session.name,
+            subtitle: formatDate(summary.session.date),
+            stats: [
+              { value: String(summary.session.durationMin), label: "minuten" },
+              { value: totals.volumeKg.toLocaleString("nl-NL"), label: "kg volume" },
+              { value: String(totals.sets), label: "werksets" },
+              { value: `+${summary.xp.gained}`, label: `XP · level ${summary.xp.levelAfter}` },
+            ],
+            lines: summary.prs.slice(0, 3).map((pr) => `Record: ${pr.exercise} ${pr.weight} kg × ${pr.reps}`),
+          }}
+        />
         <Link to="/" className="block">
           <Button variant="secondary" className="w-full">
             Naar dashboard
