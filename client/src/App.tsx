@@ -10,6 +10,7 @@ import WorkoutHistory from "./pages/WorkoutHistory.js";
 import FoodLog from "./pages/FoodLog.js";
 import Goals from "./pages/Goals.js";
 import Recipes from "./pages/Recipes.js";
+import WorkoutSummaryPage from "./pages/WorkoutSummary.js";
 import Profile from "./pages/Profile.js";
 import Agenda from "./pages/Agenda.js";
 import Coach from "./pages/Coach.js";
@@ -36,6 +37,7 @@ function AppRoutes() {
                 <Route path="train" element={<ProgramsList />} />
                 <Route path="train/programs/:id" element={<ProgramEditor />} />
                 <Route path="train/session/:id" element={<ActiveWorkout />} />
+                <Route path="train/session/:id/summary" element={<WorkoutSummaryPage />} />
                 <Route path="train/history" element={<WorkoutHistory />} />
                 <Route path="eat" element={<FoodLog />} />
                 <Route path="eat/goals" element={<Goals />} />

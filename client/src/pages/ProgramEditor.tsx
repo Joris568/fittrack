@@ -109,6 +109,16 @@ function AddExerciseForm({ dayId, onAdded }: { dayId: string; onAdded: () => voi
 function DayCard({ day, onChange }: { day: ProgramDay; onChange: () => void }) {
   const [adding, setAdding] = useState(false);
 
+  async function moveExercise(index: number, delta: -1 | 1) {
+    const to = index + delta;
+    if (to < 0 || to >= day.exercises.length) return;
+    // renumber the whole day so equal/missing order values can't make the swap a no-op
+    const order = day.exercises.map((e) => e.id);
+    [order[index], order[to]] = [order[to], order[index]];
+    await Promise.all(order.map((peId, i) => api.patch(`/programs/exercises/${peId}`, { order: i })));
+    onChange();
+  }
+
   async function removeExercise(id: string) {
     await api.delete(`/programs/exercises/${id}`);
     onChange();
@@ -129,9 +139,22 @@ function DayCard({ day, onChange }: { day: ProgramDay; onChange: () => void }) {
         </button>
       </div>
       <div className="space-y-1.5">
-        {day.exercises.map((pe) => (
-          <div key={pe.id} className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2 text-sm">
-            <div>
+        {day.exercises.map((pe, index) => (
+          <div key={pe.id} className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-2 text-sm gap-2">
+            <div className="flex flex-col shrink-0 -my-1">
+              <button className="text-gray-400 disabled:opacity-20 leading-none px-1.5 py-0.5" disabled={index === 0} onClick={() => moveExercise(index, -1)} aria-label="Omhoog">
+                ▲
+              </button>
+              <button
+                className="text-gray-400 disabled:opacity-20 leading-none px-1.5 py-0.5"
+                disabled={index === day.exercises.length - 1}
+                onClick={() => moveExercise(index, 1)}
+                aria-label="Omlaag"
+              >
+                ▼
+              </button>
+            </div>
+            <div className="flex-1 min-w-0">
               <p className="font-medium">{pe.exercise.name}</p>
               <p className="text-xs text-gray-400">
                 {pe.targetSets}x{pe.targetRepsMin}-{pe.targetRepsMax}

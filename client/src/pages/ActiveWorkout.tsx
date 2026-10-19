@@ -1,315 +1,250 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client.js";
-import { Exercise, ProgramExercise, SetLog, WithAchievements, WorkoutSession } from "../api/types.js";
-import { Button, Card, Input, Spinner } from "../components/ui.js";
-import { suggestNext, type Suggestion } from "../lib/progression.js";
-import { enqueueSet, getQueuedSets, isNetworkError, subscribeQueue, type QueuedSet } from "../lib/offlineQueue.js";
-import { emitAchievements } from "../lib/achievementBus.js";
+import { Exercise, WorkoutSession, WorkoutSummary } from "../api/types.js";
+import { Spinner } from "../components/ui.js";
+import ExercisePicker from "../components/ExercisePicker.js";
+import ExerciseSheet from "../components/ExerciseSheet.js";
 import RestTimer from "../components/RestTimer.js";
-import { calculatePlatesPerSide } from "../lib/plates.js";
+import ExerciseCard from "../components/workout/ExerciseCard.js";
+import {
+  addItem,
+  deriveLayout,
+  moveItem,
+  removeItem,
+  replaceItem,
+  serializeLayout,
+  workingSetCounts,
+  type LayoutItem,
+} from "../lib/workoutLayout.js";
 
-const DEFAULT_REST_SECONDS = 90;
-
-function SetRow({ set, onDelete }: { set: SetLog; onDelete: () => void }) {
-  return (
-    <div className="flex justify-between items-center text-sm py-1.5 border-b border-gray-100 last:border-0">
-      <span>
-        Set {set.setNumber}: <strong>{set.reps}</strong> reps @ <strong>{set.weight}</strong>kg
-        {set.rpe ? ` (RPE ${set.rpe})` : ""}
-        {set.isPR && <span className="ml-1.5 text-[10px] font-bold tracking-wide text-brand-600 bg-brand-50 rounded px-1.5 py-0.5">PR</span>}
-      </span>
-      <button className="text-gray-300 text-xs" onClick={onDelete}>
-        ✕
-      </button>
-    </div>
-  );
-}
-
-function ExerciseBlock({
-  exercise,
-  target,
-  sets,
-  sessionId,
-  onChange,
-}: {
-  exercise: Exercise;
-  target?: ProgramExercise;
-  sets: SetLog[];
-  sessionId: string;
-  onChange: () => void;
-}) {
-  const [reps, setReps] = useState(target ? String(target.targetRepsMin) : "");
-  const [weight, setWeight] = useState(target?.targetWeight ? String(target.targetWeight) : "");
-  const [rpe, setRpe] = useState("");
-  const [lastTime, setLastTime] = useState<SetLog[] | null>(null);
-  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
-  const [queued, setQueued] = useState<QueuedSet[]>(() => getQueuedSets(sessionId).filter((q) => q.payload.exerciseId === exercise.id));
-  const [restKey, setRestKey] = useState<string | null>(null);
-  const [showPlates, setShowPlates] = useState(false);
-
-  useEffect(() => {
-    api.get<SetLog[]>(`/workouts/exercise/${exercise.id}/history`).then((h) => {
-      const filtered = h.filter((s) => s.workoutSessionId !== sessionId);
-      // History is newest-first, so the first row's session is the previous time you trained this.
-      const lastSession = filtered.filter((s) => s.workoutSessionId === filtered[0]?.workoutSessionId).reverse();
-      setLastTime(lastSession);
-      const next = target ? suggestNext(lastSession, target.targetRepsMin, target.targetRepsMax) : null;
-      setSuggestion(next);
-      // Pre-fill the inputs so logging a set is one tap when you follow the suggestion.
-      if (next) {
-        setWeight(String(next.weight));
-        setReps(String(next.reps));
-      }
-    });
-  }, [exercise.id, sessionId]);
-
-  useEffect(() => {
-    const refresh = () => setQueued(getQueuedSets(sessionId).filter((q) => q.payload.exerciseId === exercise.id));
-    const unsubscribe = subscribeQueue(refresh);
-    // queued sets just reached the server: reload the real list
-    const onSynced = () => onChange();
-    window.addEventListener("fittrack:synced", onSynced);
-    return () => {
-      unsubscribe();
-      window.removeEventListener("fittrack:synced", onSynced);
-    };
-  }, [sessionId, exercise.id, onChange]);
-
-  async function addSet(e: React.FormEvent) {
-    e.preventDefault();
-    if (!reps || !weight) return;
-    const clientId = crypto.randomUUID();
-    const payload = {
-      exerciseId: exercise.id,
-      setNumber: sets.length + queued.length + 1,
-      reps: Number(reps),
-      weight: Number(weight),
-      rpe: rpe ? Number(rpe) : undefined,
-    };
-    try {
-      const result = await api.post<SetLog & WithAchievements>(
-        `/workouts/${sessionId}/sets`,
-        { ...payload, clientId },
-        { signal: AbortSignal.timeout(12_000) }
-      );
-      emitAchievements(result.newAchievements);
-      setRestKey(result.id);
-      onChange();
-    } catch (err) {
-      if (!isNetworkError(err)) throw err;
-      // No (or too slow) connection: keep the set locally and sync it later.
-      enqueueSet(sessionId, payload, clientId);
-      setRestKey(clientId);
-    }
-    setRpe("");
-  }
-
-  async function deleteSet(id: string) {
-    await api.delete(`/workouts/sets/${id}`);
-    onChange();
-  }
-
-  return (
-    <Card>
-      <h3 className="font-semibold mb-1">{exercise.name}</h3>
-      {target && (
-        <p className="text-xs text-gray-400 mb-1">
-          Doel: {target.targetSets}x{target.targetRepsMin}-{target.targetRepsMax}
-          {target.targetWeight ? ` @ ${target.targetWeight}kg` : ""}
-        </p>
-      )}
-      {lastTime && lastTime.length > 0 && (
-        <p className="text-xs text-gray-400 mb-2">
-          Vorige keer: {lastTime.map((s) => `${s.reps}x${s.weight}kg`).join(", ")}
-        </p>
-      )}
-      {suggestion && (
-        <button
-          type="button"
-          onClick={() => {
-            setWeight(String(suggestion.weight));
-            setReps(String(suggestion.reps));
-          }}
-          className="w-full text-left text-xs rounded-lg bg-brand-50 text-brand-700 px-3 py-2 mb-2"
-        >
-          <span className="font-semibold">Suggestie: {suggestion.weight} kg × {suggestion.reps}.</span> {suggestion.text}
-        </button>
-      )}
-      {(sets.length > 0 || queued.length > 0) && (
-        <div className="mb-2">
-          {sets.map((s) => (
-            <SetRow key={s.id} set={s} onDelete={() => deleteSet(s.id)} />
-          ))}
-          {queued.map((q, i) => (
-            <div key={q.clientId} className="flex justify-between items-center text-sm py-1.5 border-b border-gray-100 last:border-0 text-gray-500">
-              <span>
-                Set {sets.length + i + 1}: {String(q.payload.reps)} × {String(q.payload.weight)} kg
-              </span>
-              <span className="text-xs text-amber-700">wacht op verbinding</span>
-            </div>
-          ))}
-        </div>
-      )}
-      <form onSubmit={addSet} className="flex gap-2 items-center">
-        <Input
-          type="number"
-          inputMode="decimal"
-          step="0.1"
-          placeholder="kg"
-          value={weight}
-          onChange={(e) => setWeight(e.target.value)}
-          className="!py-2"
-        />
-        <Input
-          type="number"
-          inputMode="numeric"
-          placeholder="reps"
-          value={reps}
-          onChange={(e) => setReps(e.target.value)}
-          className="!py-2"
-        />
-        <Input
-          type="number"
-          inputMode="numeric"
-          placeholder="RPE"
-          value={rpe}
-          onChange={(e) => setRpe(e.target.value)}
-          className="!py-2"
-        />
-        <Button type="submit" className="!px-3 !py-2 shrink-0">
-          Set {sets.length + queued.length + 1}
-        </Button>
-      </form>
-      {weight && Number(weight) > 20 && (
-        <button
-          type="button"
-          className="text-xs text-gray-400 mt-1.5"
-          onClick={() => setShowPlates((v) => !v)}
-        >
-          Platen per kant {showPlates ? "▲" : "▼"}
-        </button>
-      )}
-      {showPlates && weight && (
-        <p className="text-xs text-gray-500 mt-1">
-          {(() => {
-            const plates = calculatePlatesPerSide(Number(weight));
-            return plates.length > 0
-              ? `${plates.join(" + ")}kg per kant (bar 20kg)`
-              : "Alleen de lege stang (20kg) nodig.";
-          })()}
-        </p>
-      )}
-      {restKey && (
-        <div className="mt-2">
-          <RestTimer
-            seconds={target?.restSeconds ?? DEFAULT_REST_SECONDS}
-            startKey={restKey}
-            onDone={() => {}}
-          />
-        </div>
-      )}
-    </Card>
-  );
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
 }
 
 export default function ActiveWorkout() {
   const { id } = useParams<{ id: string }>();
-  const [session, setSession] = useState<WorkoutSession | null>(null);
-  const [extraExercises, setExtraExercises] = useState<Exercise[]>([]);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Exercise[]>([]);
   const navigate = useNavigate();
+  const [session, setSession] = useState<WorkoutSession | null>(null);
+  const [layout, setLayout] = useState<LayoutItem[] | null>(null);
+  const [extraExercises, setExtraExercises] = useState<Exercise[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [rest, setRest] = useState<{ key: string; seconds: number } | null>(null);
+  const [picker, setPicker] = useState<{ mode: "add" } | { mode: "replace"; index: number } | null>(null);
+  const [sheet, setSheet] = useState<Exercise | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [finishing, setFinishing] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const prevCounts = useRef<Map<string, number> | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     if (!id) return;
     const s = await api.get<WorkoutSession>(`/workouts/${id}`);
     setSession(s);
-  }
-
-  useEffect(() => {
-    load();
+    setLayout((cur) => {
+      if (!cur) return deriveLayout(s);
+      // keep the user's order, but make sure anything with logged sets is present
+      const present = new Set(cur.map((i) => i.exerciseId));
+      const missing = deriveLayout(s).filter((i) => !present.has(i.exerciseId) && s.setLogs.some((l) => l.exerciseId === i.exerciseId));
+      return missing.length ? [...cur, ...missing] : cur;
+    });
   }, [id]);
 
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const exerciseMap = useMemo(() => {
+    const m = new Map<string, Exercise>();
+    for (const pe of session?.programDay?.exercises ?? []) m.set(pe.exerciseId, pe.exercise);
+    for (const l of session?.setLogs ?? []) m.set(l.exerciseId, l.exercise);
+    for (const e of extraExercises) m.set(e.id, e);
+    return m;
+  }, [session, extraExercises]);
+
+  const counts = useMemo(() => workingSetCounts(session?.setLogs ?? []), [session]);
+
+  // A saved layout can contain exercises that aren't in the program or logged yet (added or
+  // swapped in earlier) — look those up so they still show after a reload.
+  const missingKey = layout ? layout.filter((i) => !exerciseMap.has(i.exerciseId)).map((i) => i.exerciseId).join(",") : "";
+  useEffect(() => {
+    if (!missingKey) return;
+    const wanted = new Set(missingKey.split(","));
+    api
+      .get<Exercise[]>("/exercises")
+      .then((all) => setExtraExercises((prev) => [...prev, ...all.filter((e) => wanted.has(e.id) && !prev.some((p) => p.id === e.id))]))
+      .catch(() => {});
+  }, [missingKey]);
+
+  // open the first unfinished exercise at start; afterwards move on when one is completed
+  useEffect(() => {
+    if (!layout || !session) return;
+    if (prevCounts.current === null) {
+      const first = layout.find((i) => (counts.get(i.exerciseId) ?? 0) < i.targetSets);
+      setOpenId(first?.exerciseId ?? layout[0]?.exerciseId ?? null);
+    } else {
+      const justFinished = layout.findIndex((i) => (prevCounts.current!.get(i.exerciseId) ?? 0) < i.targetSets && (counts.get(i.exerciseId) ?? 0) >= i.targetSets);
+      if (justFinished >= 0) {
+        const next = layout.slice(justFinished + 1).find((i) => (counts.get(i.exerciseId) ?? 0) < i.targetSets) ?? layout.find((i) => (counts.get(i.exerciseId) ?? 0) < i.targetSets);
+        setOpenId(next?.exerciseId ?? null);
+      }
     }
-    const t = setTimeout(async () => {
-      setResults(await api.get<Exercise[]>(`/exercises?q=${encodeURIComponent(query)}`));
-    }, 200);
-    return () => clearTimeout(t);
-  }, [query]);
+    prevCounts.current = counts;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [counts, session?.id, layout?.length]);
 
-  if (!session) return <Spinner />;
-
-  const plannedExercises = session.programDay?.exercises ?? [];
-  const setsByExercise = new Map<string, SetLog[]>();
-  for (const s of session.setLogs) {
-    const arr = setsByExercise.get(s.exerciseId) ?? [];
-    arr.push(s);
-    setsByExercise.set(s.exerciseId, arr);
+  function persist(items: LayoutItem[]) {
+    setLayout(items);
+    if (id) api.patch(`/workouts/${id}`, { layout: serializeLayout(items) }).catch(() => {});
   }
 
-  const plannedIds = new Set(plannedExercises.map((pe) => pe.exerciseId));
-  const extraLogged = [...setsByExercise.keys()]
-    .filter((exId) => !plannedIds.has(exId))
-    .map((exId) => setsByExercise.get(exId)![0].exercise);
+  function showToast(text: string) {
+    setToast(text);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3200);
+  }
 
-  const allExtra = [...extraLogged, ...extraExercises.filter((e) => !extraLogged.some((x) => x.id === e.id))];
+  async function finish() {
+    if (!id || finishing || !session) return;
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    if (total === 0 && !confirm("Je hebt nog geen sets gelogd. Toch afronden?")) return;
+    const planned = (layout ?? []).reduce((n, i) => n + i.targetSets, 0);
+    const done = (layout ?? []).reduce((n, i) => n + Math.min(counts.get(i.exerciseId) ?? 0, i.targetSets), 0);
+    if (total > 0 && done < planned && !confirm(`Je hebt ${done} van de ${planned} geplande sets gedaan. Afronden?`)) return;
+    setFinishing(true);
+    try {
+      const summary = await api.post<WorkoutSummary>(`/workouts/${id}/finish`);
+      if (navigator.vibrate) navigator.vibrate([60, 50, 60]);
+      navigate(`/train/session/${id}/summary`, { state: { summary, fresh: true } });
+    } catch {
+      setFinishing(false);
+      showToast("Afronden mislukt. Check je verbinding en probeer opnieuw.");
+    }
+  }
+
+  if (!session || !layout) return <Spinner />;
+
+  const started = new Date(session.date).getTime();
+  const elapsed = now - started;
+  const planned = layout.reduce((n, i) => n + i.targetSets, 0);
+  const done = layout.reduce((n, i) => n + Math.min(counts.get(i.exerciseId) ?? 0, i.targetSets), 0);
+  const pct = planned > 0 ? Math.round((done / planned) * 100) : 0;
 
   return (
-    <div className="space-y-4 pb-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold">{session.programDay?.name ?? "Vrije training"}</h1>
-        <Button variant="secondary" className="!px-3 !py-1.5 text-sm" onClick={() => navigate("/train")}>
-          Klaar
-        </Button>
+    <div className="pb-40">
+      <div className="sticky top-0 z-30 -mx-4 px-4 pt-3 pb-3 mb-4 bg-bg/95 backdrop-blur border-b border-gray-100">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display font-bold text-xl tracking-tight truncate">{session.programDay?.name ?? "Vrije training"}</h1>
+            <p className="text-xs text-gray-500">
+              {elapsed < 8 * 3600_000 ? `${formatElapsed(elapsed)} · ` : ""}
+              {done}/{planned} sets
+            </p>
+          </div>
+          <button
+            onClick={finish}
+            disabled={finishing}
+            className="shrink-0 px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold active:scale-[0.97] transition-transform disabled:opacity-50"
+          >
+            {finishing ? "Bezig..." : "Afronden"}
+          </button>
+        </div>
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mt-2.5">
+          <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+        </div>
       </div>
 
-      {plannedExercises.map((pe) => (
-        <ExerciseBlock
-          key={pe.id}
-          exercise={pe.exercise}
-          target={pe}
-          sets={setsByExercise.get(pe.exerciseId) ?? []}
-          sessionId={session.id}
-          onChange={load}
-        />
-      ))}
+      {toast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 max-w-[92%] animate-pop rounded-xl bg-gray-900 text-white px-4 py-2.5 text-sm font-medium shadow-card">
+          {toast}
+        </div>
+      )}
 
-      {allExtra.map((ex) => (
-        <ExerciseBlock
-          key={ex.id}
-          exercise={ex}
-          sets={setsByExercise.get(ex.id) ?? []}
-          sessionId={session.id}
-          onChange={load}
-        />
-      ))}
-
-      <Card>
-        <p className="text-sm font-medium mb-2">Extra oefening toevoegen</p>
-        <Input placeholder="Zoek oefening..." value={query} onChange={(e) => setQuery(e.target.value)} />
-        {results.length > 0 && (
-          <div className="mt-1 bg-surface border border-gray-200 rounded-lg overflow-hidden">
-            {results.map((r) => (
-              <button
-                key={r.id}
-                className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0"
-                onClick={() => {
-                  setExtraExercises((prev) => [...prev, r]);
-                  setQuery("");
-                  setResults([]);
-                }}
-              >
-                {r.name}
-              </button>
-            ))}
+      <div className="space-y-3">
+        {layout.length === 0 && (
+          <div className="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+            Nog geen oefeningen. Voeg je eerste oefening toe om te beginnen.
           </div>
         )}
-      </Card>
+        {layout.map((item, index) => {
+          const exercise = exerciseMap.get(item.exerciseId);
+          if (!exercise) return null;
+          return (
+            <ExerciseCard
+              key={item.exerciseId}
+              index={index}
+              total={layout.length}
+              exercise={exercise}
+              item={item}
+              sets={session.setLogs.filter((s) => s.exerciseId === item.exerciseId)}
+              sessionId={session.id}
+              open={openId === item.exerciseId}
+              onToggle={() => setOpenId((cur) => (cur === item.exerciseId ? null : item.exerciseId))}
+              onChange={load}
+              onMove={(delta) => persist(moveItem(layout, index, delta))}
+              onReplace={() => setPicker({ mode: "replace", index })}
+              onRemove={() => persist(removeItem(layout, index))}
+              onInfo={() => setSheet(exercise)}
+              onSetLogged={({ isPR, restSeconds, exerciseName, weight, reps }) => {
+                setRest({ key: `${Date.now()}`, seconds: restSeconds });
+                if (isPR) {
+                  if (navigator.vibrate) navigator.vibrate([40, 60, 40, 60, 140]);
+                  showToast(`Nieuw record: ${exerciseName} ${weight} kg × ${reps}`);
+                } else if (navigator.vibrate) {
+                  navigator.vibrate(25);
+                }
+              }}
+            />
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={() => setPicker({ mode: "add" })}
+          className="w-full rounded-xl border border-dashed border-gray-300 py-3.5 text-sm font-semibold text-gray-600 active:bg-gray-50"
+        >
+          + Oefening toevoegen
+        </button>
+      </div>
+
+      {rest && (
+        <div className="fixed left-0 right-0 z-30 px-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))]">
+          <div className="max-w-2xl mx-auto shadow-card rounded-xl">
+            <RestTimer seconds={rest.seconds} startKey={rest.key} onDone={() => {}} />
+          </div>
+        </div>
+      )}
+
+      {sheet && <ExerciseSheet exerciseId={sheet.id} name={sheet.name} onClose={() => setSheet(null)} />}
+
+      {picker && (
+        <ExercisePicker
+          title={picker.mode === "add" ? "Oefening toevoegen" : "Vervang oefening"}
+          excludeIds={layout.map((i) => i.exerciseId)}
+          onClose={() => setPicker(null)}
+          onPick={(exercise) => {
+            setExtraExercises((prev) => (prev.some((e) => e.id === exercise.id) ? prev : [...prev, exercise]));
+            if (picker.mode === "add") {
+              persist(addItem(layout, exercise.id));
+              setOpenId(exercise.id);
+            } else {
+              persist(replaceItem(layout, picker.index, exercise.id));
+              setOpenId(exercise.id);
+            }
+            setPicker(null);
+          }}
+        />
+      )}
     </div>
   );
 }

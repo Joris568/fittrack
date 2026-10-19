@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Link } from "react-router-dom";
 import { api } from "../api/client.js";
 import { Exercise, SetLog, WorkoutSession } from "../api/types.js";
 import { Card, Spinner, EmptyState, PageTitle } from "../components/ui.js";
@@ -111,7 +112,7 @@ export default function WorkoutHistory() {
                   day: "numeric",
                   month: "short",
                 })}{" "}
-                · {session.setLogs.length} sets
+                · {session.setLogs.filter((s) => !s.isWarmup).length} sets
               </p>
             </div>
             <button
@@ -126,6 +127,14 @@ export default function WorkoutHistory() {
           </div>
           {expanded === session.id && (
             <div className="mt-3 space-y-1 border-t border-gray-100 pt-2">
+              <div className="flex gap-3 mb-1.5">
+                <Link to={`/train/session/${session.id}/summary`} className="text-xs font-semibold text-brand-600">
+                  Bekijk samenvatting
+                </Link>
+                <Link to={`/train/session/${session.id}`} className="text-xs font-semibold text-gray-500">
+                  Open training
+                </Link>
+              </div>
               {session.setLogs.map((s) => (
                 <p key={s.id} className="text-sm text-gray-600">
                   {s.exercise.name}: {s.reps}x{s.weight}kg{s.rpe ? ` @RPE${s.rpe}` : ""}

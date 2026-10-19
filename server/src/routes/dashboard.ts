@@ -3,6 +3,7 @@ import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
 import { XP, levelFromXp, levelTitle, questProgress, weeklySessionTarget, WEEKLY_QUESTS, type WeekStats } from "../gamification/xp.js";
 import { linearSlope, movingAverage } from "../lib/nutritionCalc.js";
+import { computeXpTotal } from "../gamification/xpTotals.js";
 
 export const dashboardRouter = Router();
 
@@ -41,7 +42,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
         date: true,
         programDayId: true,
         programDay: { select: { name: true } },
-        setLogs: { select: { weight: true, reps: true, isPR: true } },
+        setLogs: { where: { isWarmup: false }, select: { weight: true, reps: true, isPR: true } },
       },
     }),
     prisma.foodLogEntry.findMany({
@@ -74,7 +75,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
     prisma.userProfile.findUnique({ where: { userId }, select: { heightCm: true, goal: true, birthYear: true, trainDays: true } }),
     // sets in the last 7 days per muscle group (rolling week, in the user's timezone)
     prisma.setLog.findMany({
-      where: { workoutSession: { userId, date: { gte: new Date(new Date(`${addDays(todayKey, -6)}T00:00:00Z`).getTime() + tz * 60_000) } } },
+      where: { isWarmup: false, workoutSession: { userId, date: { gte: new Date(new Date(`${addDays(todayKey, -6)}T00:00:00Z`).getTime() + tz * 60_000) } } },
       select: { exercise: { select: { muscleGroup: true } } },
     }),
     prisma.plannedWorkout.count({ where: { userId, date: { gte: weekStartKey(todayKey), lte: addDays(weekStartKey(todayKey), 6) } } }),
@@ -132,16 +133,7 @@ dashboardRouter.get("/", async (req: AuthedRequest, res) => {
     (n, w) => n + WEEKLY_QUESTS.filter((q) => w[q.key] >= q.target).length,
     0
   );
-  const xp =
-    sessions.length * XP.workout +
-    totalSets * XP.set +
-    totalPRs * XP.pr +
-    dayTotals.size * XP.foodDay +
-    proteinDayCount * XP.proteinDay +
-    metrics.length * XP.bodyMetric +
-    photoCount * XP.photo +
-    unlockedCount * XP.achievement +
-    questsDoneEver * XP.quest;
+  const xp = await computeXpTotal(userId, tz); // one shared formula with the workout summary
   const lvl = levelFromXp(xp);
 
   const currentWeekKey = weekStartKey(todayKey);

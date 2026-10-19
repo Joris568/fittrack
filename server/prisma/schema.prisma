@@ -39,6 +39,7 @@ model Exercise {
   muscleGroup String
   equipment   String?
   notes       String?
+  guide       String?  // JSON ExerciseGuide, cached from an AI-written explanation
   isCustom    Boolean  @default(false)
   createdAt   DateTime @default(now())
 
@@ -94,6 +95,8 @@ model WorkoutSession {
   programDay   ProgramDay? @relation(fields: [programDayId], references: [id])
   date         DateTime @default(now())
   notes        String?
+  finishedAt   DateTime?
+  layout       String?  // JSON: the user's own exercise order/swaps for this session
   createdAt    DateTime @default(now())
 
   setLogs SetLog[]
@@ -111,6 +114,7 @@ model SetLog {
   rpe              Float?
   notes            String?
   isPR             Boolean  @default(false)
+  isWarmup         Boolean  @default(false)
   clientId         String?  // set by the app so a retried (offline-queued) set is never stored twice (plain index, not unique: a unique constraint would make `prisma db push` demand --accept-data-loss on deploy)
   createdAt        DateTime @default(now())
 

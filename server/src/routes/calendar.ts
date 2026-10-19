@@ -31,7 +31,7 @@ calendarRouter.get("/", async (req: AuthedRequest, res) => {
         date: true,
         programDayId: true,
         programDay: { select: { name: true } },
-        setLogs: { select: { weight: true, reps: true, isPR: true } },
+        setLogs: { where: { isWarmup: false }, select: { weight: true, reps: true, isPR: true } },
       },
     }),
     prisma.plannedWorkout.findMany({

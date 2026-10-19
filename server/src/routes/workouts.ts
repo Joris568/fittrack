@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import type { AuthedRequest } from "../auth/middleware.js";
 import { checkAndUnlockAchievements } from "../gamification/achievements.js";
 import { isPersonalRecord } from "../lib/strength.js";
+import { buildWorkoutSummary } from "../lib/workoutSummary.js";
 
 export const workoutsRouter = Router();
 
@@ -52,6 +53,7 @@ const createSessionSchema = z.object({
   programDayId: z.string().optional(),
   notes: z.string().optional(),
   date: z.string().datetime().optional(),
+  layout: z.string().max(8000).optional(),
 });
 
 workoutsRouter.post("/", async (req: AuthedRequest, res) => {
@@ -77,10 +79,26 @@ workoutsRouter.patch("/:id", async (req: AuthedRequest, res) => {
     data: {
       notes: parsed.data.notes,
       date: parsed.data.date ? new Date(parsed.data.date) : undefined,
+      layout: parsed.data.layout,
     },
   });
   if (result.count === 0) return res.status(404).json({ error: "Not found" });
   res.json({ ok: true });
+});
+
+/** Marks a training as finished (first call wins) and returns the summary for the celebration screen. */
+workoutsRouter.post("/:id/finish", async (req: AuthedRequest, res) => {
+  const session = await prisma.workoutSession.findFirst({ where: { id: req.params.id, userId: req.userId } });
+  if (!session) return res.status(404).json({ error: "Not found" });
+  if (!session.finishedAt) await prisma.workoutSession.update({ where: { id: session.id }, data: { finishedAt: new Date() } });
+  await checkAndUnlockAchievements(req.userId!);
+  res.json(await buildWorkoutSummary(req.userId!, session.id, req.tz));
+});
+
+workoutsRouter.get("/:id/summary", async (req: AuthedRequest, res) => {
+  const summary = await buildWorkoutSummary(req.userId!, req.params.id, req.tz);
+  if (!summary) return res.status(404).json({ error: "Not found" });
+  res.json(summary);
 });
 
 workoutsRouter.delete("/:id", async (req: AuthedRequest, res) => {
@@ -96,6 +114,7 @@ const setLogSchema = z.object({
   rpe: z.number().min(1).max(10).optional(),
   notes: z.string().optional(),
   clientId: z.string().min(8).max(64).optional(),
+  isWarmup: z.boolean().optional(),
 });
 
 workoutsRouter.post("/:id/sets", async (req: AuthedRequest, res) => {
@@ -116,10 +135,10 @@ workoutsRouter.post("/:id/sets", async (req: AuthedRequest, res) => {
   // A record = a higher estimated 1RM than any earlier set (so more reps at the same
   // weight counts too, not only a heavier weight).
   const previousSets = await prisma.setLog.findMany({
-    where: { exerciseId: parsed.data.exerciseId, workoutSession: { userId: req.userId } },
+    where: { exerciseId: parsed.data.exerciseId, isWarmup: false, workoutSession: { userId: req.userId } },
     select: { weight: true, reps: true },
   });
-  const isPR = isPersonalRecord(previousSets, parsed.data);
+  const isPR = !parsed.data.isWarmup && isPersonalRecord(previousSets, parsed.data);
 
   const setLog = await prisma.setLog.create({
     data: { workoutSessionId: session.id, ...parsed.data, isPR },

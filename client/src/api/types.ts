@@ -48,6 +48,7 @@ export interface SetLog {
   rpe?: number | null;
   notes?: string | null;
   isPR: boolean;
+  isWarmup?: boolean;
   createdAt: string;
   /** Only present on the /workouts/exercise/:id/history endpoint. */
   workoutSession?: { date: string };
@@ -60,6 +61,8 @@ export interface WorkoutSession {
   programDay?: (ProgramDay & { program: WorkoutProgram }) | null;
   date: string;
   notes?: string | null;
+  finishedAt?: string | null;
+  layout?: string | null;
   setLogs: SetLog[];
 }
 
@@ -363,4 +366,53 @@ export interface ProfileResponse {
     measured: { tdee: number; kgPerWeek: number; loggedDays: number; weighIns: number } | null;
     suggestion: { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number; basedOn: string; goal: string } | null;
   };
+}
+
+export interface ExerciseGuide {
+  muscles: { primary: string[]; secondary: string[] };
+  steps: string[];
+  cues: string[];
+  mistakes: string[];
+  tip?: string;
+}
+
+export interface ExerciseGuideResponse {
+  exercise: { id: string; name: string; muscleGroup: string; equipment: string | null };
+  guide: ExerciseGuide | null;
+  source: "kennisbank" | "ai" | "none";
+  videoUrl: string;
+}
+
+export interface ExerciseProgress {
+  sessions: { date: string; e1rm: number; topWeight: number; topReps: number; volumeKg: number; sets: number }[];
+  prCount: number;
+}
+
+export interface WorkoutSummary {
+  session: { id: string; name: string; date: string; finishedAt: string | null; durationMin: number };
+  totals: { sets: number; warmupSets: number; volumeKg: number; exercises: number; reps: number };
+  exercises: {
+    exerciseId: string;
+    name: string;
+    sets: { weight: number; reps: number; rpe?: number | null; isPR: boolean }[];
+    best: { weight: number; reps: number };
+    volumeKg: number;
+    lastBest: { weight: number; reps: number } | null;
+    e1rmDelta: number | null;
+  }[];
+  prs: { exercise: string; weight: number; reps: number }[];
+  previous: { date: string; volumeKg: number | null; deltaPct: number | null } | null;
+  xp: {
+    gained: number;
+    before: number;
+    after: number;
+    levelBefore: number;
+    levelAfter: number;
+    leveledUp: boolean;
+    title: string;
+    levelStartXp: number;
+    nextLevelXp: number;
+  };
+  week: { sessions: number; target: number; streakWeeks: number };
+  coachLine: string;
 }
